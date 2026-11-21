@@ -299,14 +299,14 @@
       if (!g) return [];
       var nodos = [h('button', { clase: 'boton', type: 'button', texto: '+ Nuevo lugar', alClick: function () { ui.editando = function () { return editorLugar(null); }; repintar(); } })];
       if (!g.lugares.length) { nodos.push(h('div', { clase: 'vacio tarjeta', style: 'margin-top:12px' }, [h('p', { texto: 'Aún no hay lugares. Crea el primero: por ejemplo, «La Malagueta».' })])); return nodos; }
-      // Son pocos lugares (menos de 10): tarjetas grandes con la miniatura del mapa a la derecha.
+      // Son pocos lugares (menos de 10): tarjetas con la miniatura del mapa a la derecha.
       g.lugares.forEach(function (l) {
         var editar = function () { ui.editando = function () { return editorLugar(l); }; repintar(); };
         nodos.push(h('div', { clase: 'tarjeta lugar' + (l.activo ? '' : ' inactivo') }, [
           h('button', { clase: 'lugar-datos', type: 'button', 'aria-label': 'Editar ' + l.nombre, alClick: editar }, [
             h('strong', { texto: l.nombre }),
             h('small', { texto: l.direccion || 'Sin dirección' }),
-            h('small', { clase: l.url_mapa ? 'ok' : '', texto: l.url_mapa ? 'Con enlace de Google Maps' : 'Sin enlace de Google Maps' }),
+            l.url_mapa ? null : h('small', { texto: 'Sin enlace de Google Maps' }),
             l.activo ? null : h('span', { clase: 'etiqueta', texto: 'Inactivo' }),
             h('span', { clase: 'lugar-editar', texto: 'Editar ›' })
           ]),
@@ -318,7 +318,7 @@
 
     /** Mapa pequeño del lugar; al tocarlo se abre Google Maps. */
     function miniatura(l) {
-      if (!l.miniatura) return h('button', { clase: 'lugar-mapa vacio-mapa', type: 'button', alClick: function () { ui.editando = function () { return editorLugar(l); }; repintar(); } }, [h('span', { texto: 'Añade la dirección o el enlace de Google Maps para ver el mapa' })]);
+      if (!l.miniatura) return h('button', { clase: 'lugar-mapa vacio-mapa', type: 'button', alClick: function () { ui.editando = function () { return editorLugar(l); }; repintar(); } }, [h('span', { texto: 'Sin mapa' })]);
       return h('a', { clase: 'lugar-mapa', href: l.mapa || l.url_mapa, target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Abrir ' + l.nombre + ' en Google Maps' }, [
         h('iframe', { src: l.miniatura, loading: 'lazy', tabindex: '-1', 'aria-hidden': 'true', title: 'Mapa de ' + l.nombre, referrerpolicy: 'no-referrer-when-downgrade' })
       ]);
