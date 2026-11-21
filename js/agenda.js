@@ -1,18 +1,36 @@
 // Hito 1.3 · Pestaña Agenda.
 // Boss: Semana (generar, ajustar y cancelar sesiones) · Actividades (con horario semanal) · Lugares.
-// Cliente y coach: la semana con lugar, hora, coach y plazas (las reservas llegan en el hito 1.4).
+// Coach (pestaña Sesiones): la semana y «Generar sesiones» de las actividades de sus lugares.
+// Cliente: la semana con lugar, hora, coach, plazas y «Cómo llegar» (las reservas llegan en el hito 1.4).
 (function () {
   'use strict';
   var DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   var DIAS_CORTOS = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  var ui = { modo: 'semana', desde: null, semana: null, gestion: null, editando: null };
+  var ui = { modo: 'semana', desde: null, semana: null, gestion: null, opciones: null, resultado: null, editando: null };
 
   function sumarDias(iso, n) {
     var p = iso.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
     return d.toISOString().slice(0, 10);
   }
   function diaMes(iso) { var p = iso.split('-'); return +p[2] + ' ' + MESES[+p[1] - 1]; }
+  function diaMesAnio(iso) { return diaMes(iso) + ' ' + iso.slice(0, 4); }
+  /** Suma meses a una fecha (31 ene + 1 mes = 28/29 feb). */
+  function sumarMeses(iso, n) {
+    var p = iso.split('-'); var y = +p[0], m = +p[1] - 1 + n, d = +p[2];
+    var ultimo = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(y, m, Math.min(d, ultimo))).toISOString().slice(0, 10);
+  }
+  // Duraciones para «Generar sesiones»: la fecha final es el día anterior a desde + duración.
+  var DURACIONES = [
+    ['1s', '1 semana', function (d) { return sumarDias(d, 6); }],
+    ['2s', '2 semanas', function (d) { return sumarDias(d, 13); }],
+    ['1m', '1 mes', function (d) { return sumarDias(sumarMeses(d, 1), -1); }],
+    ['3m', '3 meses', function (d) { return sumarDias(sumarMeses(d, 3), -1); }],
+    ['6m', '6 meses', function (d) { return sumarDias(sumarMeses(d, 6), -1); }],
+    ['1a', '1 año', function (d) { return sumarDias(sumarMeses(d, 12), -1); }],
+    ['fin', 'Hasta una fecha (reto)', null]
+  ];
   function textoPlazas(s) {
     if (s.cupo === '' || s.cupo === null) return { texto: 'Sin límite de plazas', clase: '' };
     if (s.libres === 0) return { texto: 'Completa', clase: 'completa' };
@@ -22,6 +40,7 @@
   window.VistaAgenda = function (U, usuario) {
     var h = U.h, aviso = U.aviso;
     var esBoss = usuario.rol === 'BOSS';
+    var puedeGenerar = esBoss || usuario.rol === 'COACH';
     var caja = h('div', {});
 
     function repintar() {
@@ -60,9 +79,10 @@
         h('strong', { texto: diaMes(d.desde) + ' – ' + diaMes(d.hasta) }),
         h('button', { type: 'button', 'aria-label': 'Semana siguiente', texto: '›', alClick: function () { ui.desde = sumarDias(d.desde, 7); ui.semana = null; cargar(); } })
       ])];
-      if (esBoss) nodos.push(tarjetaGenerar());
+      if (puedeGenerar) nodos.push(h('button', { clase: 'boton', type: 'button', style: 'margin-bottom:12px', texto: 'Generar sesiones', alClick: function () { ui.editando = function () { return editorGenerar(); }; repintar(); } }));
+      if (ui.resultado) { nodos.push(aviso('ok', ui.resultado)); ui.resultado = null; }
       if (!d.sesiones.length) {
-        nodos.push(h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: esBoss ? 'No hay sesiones esta semana. Crea actividades con su horario y pulsa «Generar».' : 'No hay actividades programadas esta semana.' })]));
+        nodos.push(h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: esBoss ? 'No hay sesiones esta semana. Crea actividades con su horario y pulsa «Generar sesiones».' : puedeGenerar ? 'No hay sesiones esta semana. Pulsa «Generar sesiones» para crearlas.' : 'No hay actividades programadas esta semana.' })]));
         return nodos;
       }
       var porDia = {};
@@ -72,7 +92,7 @@
         nodos.push(h('p', { clase: 'seccion', texto: (f === d.hoy ? 'Hoy · ' : '') + ss[0].dia + ' ' + diaMes(f) }));
         nodos.push(h('div', { clase: 'grupo' }, ss.map(function (s) { return filaSesion(s); })));
       });
-      if (!esBoss) nodos.push(h('p', { clase: 'subtitulo', style: 'text-align:center;margin-top:16px', texto: 'Muy pronto podrás reservar tu plaza desde aquí.' }));
+      if (!puedeGenerar) nodos.push(h('p', { clase: 'subtitulo', style: 'text-align:center;margin-top:16px', texto: 'Muy pronto podrás reservar tu plaza desde aquí.' }));
       return nodos;
     }
 
@@ -88,23 +108,82 @@
           h('small', { clase: pl.clase, texto: cancelada ? 'Cancelada' : pl.texto + (s.ocupadas && s.cupo === '' ? ' · ' + s.ocupadas + ' apuntados' : '') })
         ])
       ];
-      if (!esBoss) return h('div', { clase: 'fila sesion' }, contenido);
+      if (!esBoss) {
+        if (s.mapa && !cancelada) contenido.push(h('a', { clase: 'mapa', href: s.mapa, target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Cómo llegar a ' + s.lugar, texto: 'Cómo llegar' }));
+        return h('div', { clase: 'fila sesion' }, contenido);
+      }
       return h('button', { clase: 'fila sesion', type: 'button', 'aria-label': 'Editar ' + s.actividad + ' ' + s.dia + ' ' + s.hora_inicio, alClick: function () { ui.editando = function () { return editorSesion(s); }; repintar(); } }, contenido.concat([U.icono('chev', 18)]));
     }
 
-    function tarjetaGenerar() {
-      var semanas = h('select', { id: 'semanasGenerar', 'aria-label': 'Semanas' }, [2, 4, 8, 12].map(function (n) { return h('option', { value: String(n), selected: n === 4, texto: n + ' semanas' }); }));
+    // ------------------------------------------------ generar sesiones (Boss: todos los lugares · Coach: los suyos)
+    function editorGenerar() {
+      var volver = h('button', { clase: 'volver', type: 'button', texto: '‹ Semana', alClick: function () { ui.editando = null; repintar(); } });
+      var op = ui.opciones;
+      if (!op) {
+        U.Api.llamar('sesiones.opciones').then(function (d) { ui.opciones = d; if (ui.editando) repintar(); })
+          .catch(function (e) { if (ui.editando) { repintar(); caja.appendChild(aviso('error', e.mensaje)); } });
+        return [volver, h('div', { clase: 'cargando', style: 'min-height:20vh', texto: 'Cargando actividades…' })];
+      }
+      if (!op.lugares.length) {
+        return [volver, h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: esBoss
+          ? 'No hay actividades activas. Créalas primero en «Actividades», con su horario semanal.'
+          : 'Aún no tienes ningún lugar asignado: el Boss tiene que ponerte como coach de alguna actividad.' })])];
+      }
+      var desdeDefecto = ui.semana && ui.semana.desde > op.hoy ? ui.semana.desde : op.hoy;
+      var desde = h('input', { type: 'date', id: 'gDesde', min: op.hoy, value: desdeDefecto });
+      var dur = h('select', { id: 'gDuracion' }, DURACIONES.map(function (x) { return h('option', { value: x[0], selected: x[0] === '1m', texto: x[1] }); }));
+      var hasta = h('input', { type: 'date', id: 'gHasta', min: op.hoy });
+      var campoHasta = U.campo('Hasta (incluido)', hasta);
+      var resumen = h('p', { clase: 'subtitulo', id: 'gResumen', style: 'margin:0 0 12px' });
+      var marcadas = {};
+      function fechaFin() {
+        var x = DURACIONES.filter(function (y) { return y[0] === dur.value; })[0];
+        return x && x[2] ? (desde.value ? x[2](desde.value) : '') : hasta.value;
+      }
+      function actualizar() {
+        campoHasta.style.display = dur.value === 'fin' ? '' : 'none';
+        if (dur.value !== 'fin' && desde.value) hasta.value = fechaFin();
+        hasta.min = desde.value || op.hoy;
+        var n = Object.keys(marcadas).filter(function (k) { return marcadas[k]; }).length;
+        var f = fechaFin();
+        resumen.textContent = (n ? n + (n === 1 ? ' actividad' : ' actividades') : 'Ninguna actividad elegida') +
+          (desde.value && f && f >= desde.value ? ' · del ' + diaMesAnio(desde.value) + ' al ' + diaMesAnio(f) : '');
+        bGenerar.disabled = !n;
+      }
+      var listas = op.lugares.map(function (l) {
+        var casillas = l.actividades.map(function (a) {
+          var id = 'gAct_' + a.id;
+          var sinHorario = !a.horario;
+          var c = h('input', { type: 'checkbox', id: id, value: a.id }); c.disabled = sinHorario;
+          c.addEventListener('change', function () { marcadas[a.id] = c.checked; actualizar(); });
+          return h('label', { clase: 'casilla eleccion', for: id }, [c, h('span', {}, [
+            h('strong', { texto: a.nombre }), h('small', { texto: sinHorario ? 'Sin horario semanal: no se puede generar' : a.horario + (a.coach ? ' · ' + a.coach : '') })
+          ])]);
+        });
+        return h('div', { clase: 'tarjeta', style: 'margin-bottom:8px' }, [h('p', { clase: 'seccion', style: 'margin:0 0 8px', texto: l.nombre })].concat(casillas));
+      });
       var zona = h('div', {});
-      var b = h('button', { clase: 'boton', type: 'button', texto: 'Generar sesiones', alClick: function () {
-        b.disabled = true; b.textContent = 'Generando…'; zona.innerHTML = '';
-        U.Api.llamar('sesiones.generar', { desde: ui.semana.hoy > ui.semana.desde ? ui.semana.hoy : ui.semana.desde, semanas: Number(semanas.value) }).then(function (d) {
-          ui.semana = d; ui.desde = d.desde; repintar();
-          caja.insertBefore(aviso('ok', d.creadas ? 'Creadas ' + d.creadas + ' sesiones nuevas.' : 'No había sesiones nuevas que crear: ya estaban todas.'), caja.children[2] || null);
-        }).catch(function (e) { b.disabled = false; b.textContent = 'Generar sesiones'; zona.appendChild(aviso('error', e.mensaje)); });
+      var bGenerar = h('button', { clase: 'boton', type: 'button', texto: 'Generar sesiones', alClick: function () {
+        var ids = Object.keys(marcadas).filter(function (k) { return marcadas[k]; });
+        bGenerar.disabled = true; bGenerar.textContent = 'Generando…'; zona.innerHTML = '';
+        U.Api.llamar('sesiones.generar', { actividad_ids: ids, desde: desde.value, hasta: fechaFin() }).then(function (d) {
+          ui.semana = d; ui.desde = d.desde; ui.editando = null;
+          var detalle = d.por_actividad.map(function (x) { return x.actividad + ' ' + x.creadas; }).join(', ');
+          ui.resultado = d.creadas ? 'Creadas ' + d.creadas + ' sesiones del ' + diaMes(d.periodo.desde) + ' al ' + diaMesAnio(d.periodo.hasta) + ' (' + detalle + ').'
+            : 'No había sesiones nuevas que crear en ese periodo: ya estaban todas.';
+          repintar();
+        }).catch(function (e) { bGenerar.textContent = 'Generar sesiones'; actualizar(); zona.appendChild(aviso('error', e.mensaje)); });
       } });
-      return h('div', { clase: 'tarjeta', style: 'margin-bottom:8px' }, [
-        h('p', { style: 'margin:0 0 8px', texto: 'Crea las sesiones a partir del horario de cada actividad, desde esta semana. No duplica las que ya existen.' }),
-        semanas, b, zona
+      desde.addEventListener('change', actualizar);
+      dur.addEventListener('change', function () { if (dur.value === 'fin' && !hasta.value) hasta.value = fechaFin(); actualizar(); });
+      hasta.addEventListener('change', actualizar);
+      hasta.value = DURACIONES[2][2](desdeDefecto);
+      actualizar();
+      return [volver,
+        h('p', { clase: 'seccion', texto: esBoss ? '1 · Elige las actividades' : '1 · Elige las actividades de tus lugares' })].concat(listas).concat([
+        h('p', { clase: 'seccion', texto: '2 · Elige el periodo' }),
+        h('div', { clase: 'tarjeta' }, [U.campo('Desde', desde), U.campo('Duración', dur), campoHasta, resumen, bGenerar, zona]),
+        h('p', { clase: 'subtitulo', style: 'margin-top:12px', texto: 'Se crean según el horario semanal de cada actividad. No duplica las que ya existen ni recupera las canceladas. Como mucho, un año de una vez.' })
       ]);
     }
 
@@ -195,7 +274,7 @@
         bGuardar.disabled = true; bGuardar.textContent = 'Guardando…'; zona.innerHTML = '';
         U.Api.llamar('actividades.guardar', { id: a.id, nombre: nombre.value, descripcion: desc.value, lugar_id: lugar.value, coach_id: coach.value,
           cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, horario: filas })
-          .then(function (d) { ui.gestion = d; ui.editando = null; repintar(); })
+          .then(function (d) { ui.gestion = d; ui.opciones = null; ui.editando = null; repintar(); })
           .catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = 'Guardar actividad'; zona.appendChild(aviso('error', e.mensaje)); });
       } });
       return [
@@ -222,7 +301,7 @@
       if (!g.lugares.length) { nodos.push(h('div', { clase: 'vacio tarjeta', style: 'margin-top:12px' }, [h('p', { texto: 'Aún no hay lugares. Crea el primero: por ejemplo, «La Malagueta».' })])); return nodos; }
       nodos.push(h('div', { clase: 'grupo', style: 'margin-top:12px' }, g.lugares.map(function (l) {
         return h('button', { clase: 'fila', type: 'button', alClick: function () { ui.editando = function () { return editorLugar(l); }; repintar(); } }, [
-          h('div', { clase: 'principal' }, [h('span', { texto: l.nombre }), h('small', { texto: l.direccion || '—' })]),
+          h('div', { clase: 'principal' }, [h('span', { texto: l.nombre }), h('small', { texto: (l.direccion || '—') + (l.url_mapa ? ' · con mapa' : '') })]),
           l.activo ? U.icono('chev', 18) : h('span', { clase: 'etiqueta', texto: 'Inactivo' })
         ]);
       })));
@@ -230,21 +309,25 @@
     }
 
     function editorLugar(l) {
-      l = l || { nombre: '', direccion: '', notas: '', activo: true };
+      l = l || { nombre: '', direccion: '', notas: '', url_mapa: '', activo: true };
       var nombre = h('input', { type: 'text', id: 'lNombre', maxlength: '80', value: l.nombre });
       var dir = h('input', { type: 'text', id: 'lDir', maxlength: '160', value: l.direccion || '', placeholder: 'Para que los clientes lo encuentren' });
+      var mapa = h('input', { type: 'url', id: 'lMapa', maxlength: '500', inputmode: 'url', value: l.url_mapa || '', placeholder: 'https://maps.app.goo.gl/…' });
       var notas = h('textarea', { id: 'lNotas', maxlength: '300', rows: '2' }); notas.value = l.notas || '';
       var activo = h('input', { type: 'checkbox', id: 'lActivo' }); activo.checked = l.activo !== false;
       var zona = h('div', {});
       var b = h('button', { clase: 'boton', type: 'button', texto: 'Guardar lugar', alClick: function () {
         b.disabled = true; b.textContent = 'Guardando…'; zona.innerHTML = '';
-        U.Api.llamar('lugares.guardar', { id: l.id, nombre: nombre.value, direccion: dir.value, notas: notas.value, activo: activo.checked })
-          .then(function (d) { ui.gestion = d; ui.editando = null; repintar(); })
+        U.Api.llamar('lugares.guardar', { id: l.id, nombre: nombre.value, direccion: dir.value, url_mapa: mapa.value, notas: notas.value, activo: activo.checked })
+          .then(function (d) { ui.gestion = d; ui.opciones = null; ui.editando = null; repintar(); })
           .catch(function (e) { b.disabled = false; b.textContent = 'Guardar lugar'; zona.appendChild(aviso('error', e.mensaje)); });
       } });
       return [
         h('button', { clase: 'volver', type: 'button', texto: '‹ Lugares', alClick: function () { ui.editando = null; repintar(); } }),
-        h('div', { clase: 'tarjeta' }, [U.campo('Nombre', nombre), U.campo('Dirección', dir), U.campo('Notas internas', notas),
+        h('div', { clase: 'tarjeta' }, [U.campo('Nombre', nombre), U.campo('Dirección', dir),
+          U.campo('Enlace de Google Maps', mapa, 'En Google Maps, busca el sitio → Compartir → Copiar enlace, y pégalo aquí. Los clientes verán «Cómo llegar». Si lo dejas vacío, se usará la dirección.'),
+          l.url_mapa ? h('a', { clase: 'mapa', href: l.url_mapa, target: '_blank', rel: 'noopener noreferrer', texto: 'Probar el enlace' }) : null,
+          U.campo('Notas internas', notas),
           h('label', { clase: 'casilla', for: 'lActivo' }, [activo, h('span', { texto: 'Lugar activo' })]), b, zona])
       ];
     }
@@ -253,5 +336,5 @@
     return [caja];
   };
 
-  window.VistaAgenda.reiniciar = function () { ui = { modo: 'semana', desde: null, semana: null, gestion: null, editando: null }; };
+  window.VistaAgenda.reiniciar = function () { ui = { modo: 'semana', desde: null, semana: null, gestion: null, opciones: null, resultado: null, editando: null }; };
 })();

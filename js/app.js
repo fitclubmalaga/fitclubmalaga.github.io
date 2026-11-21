@@ -310,7 +310,7 @@
     var u = inicio.usuario;
     var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), h('div', { clase: 'avatar', 'aria-hidden': 'true', texto: iniciales(u) })]);
     var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios()
-      : actual.id === 'agenda' && window.VistaAgenda ? window.VistaAgenda(UI, u) : vistaProximamente(actual);
+      : (actual.id === 'agenda' || (actual.id === 'sesiones' && u.rol === 'COACH')) && window.VistaAgenda ? window.VistaAgenda(UI, u) : vistaProximamente(actual);
     pintar([cabecera].concat(vista), true);
   }
 
