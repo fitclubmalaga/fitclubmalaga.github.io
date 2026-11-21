@@ -65,7 +65,8 @@
     } }, [h('label', { for: 'email', texto: 'Tu email' }), email, btn, zonaMsg]);
     pintar([
       h('div', { clase: 'marca' }, [h('div', { clase: 'logo', 'aria-hidden': 'true', texto: 'F' }), h('h1', { texto: 'Fitclub Málaga' }), h('p', { texto: 'Entra con tu email. Te enviaremos un código.' })]),
-      form
+      form,
+      h('button', { clase: 'boton enlace', type: 'button', texto: '¿Eres nuevo? Darme de alta', alClick: function () { pantallaAlta(email.value); } })
     ], false);
     setTimeout(function () { email.focus(); }, 50);
   }
@@ -98,6 +99,154 @@
     setTimeout(function () { codigo.focus(); }, 50);
   }
 
+
+  // ---------- alta propia (hito 1.2) ----------
+  function campo(etiqueta, input, ayuda) {
+    return h('div', { clase: 'campo' }, [h('label', { for: input.id, texto: etiqueta }), input, ayuda ? h('p', { clase: 'subtitulo', style: 'margin:6px 0 0', texto: ayuda }) : null]);
+  }
+  function pantallaAlta(emailPrevio) {
+    var nombre = h('input', { type: 'text', id: 'nombre', autocomplete: 'given-name', maxlength: '60' });
+    var apellidos = h('input', { type: 'text', id: 'apellidos', autocomplete: 'family-name', maxlength: '60' });
+    var email = h('input', { type: 'email', id: 'emailAlta', autocomplete: 'email', inputmode: 'email', value: emailPrevio || '' });
+    var tel = h('input', { type: 'tel', id: 'telefono', autocomplete: 'tel', inputmode: 'tel', placeholder: '600 00 00 00' });
+    var nac = h('input', { type: 'date', id: 'nacimiento', autocomplete: 'bday', max: new Date().toISOString().slice(0, 10) });
+    var acepto = h('input', { type: 'checkbox', id: 'privacidad' });
+    var textoPriv = h('span', { texto: 'Acepto que el club trate mis datos para gestionar mi alta y mis actividades.' });
+    var btn = h('button', { clase: 'boton', type: 'submit', texto: 'Darme de alta' });
+    var zonaMsg = h('div', {});
+    Api.llamar('alta.textoPrivacidad').then(function (d) { if (d && d.texto) textoPriv.textContent = d.texto; }).catch(function () {});
+    var form = h('form', { clase: 'tarjeta', novalidate: true, alSubmit: function (ev) {
+      ev.preventDefault();
+      zonaMsg.innerHTML = '';
+      btn.disabled = true; btn.textContent = 'Enviando…';
+      Api.llamar('alta.registrar', { nombre: nombre.value, apellidos: apellidos.value, email: email.value, telefono: tel.value, fecha_nacimiento: nac.value, acepta_privacidad: acepto.checked })
+        .then(function (d) { pantallaCodigo(email.value.trim(), d.mensaje); })
+        .catch(function (err) { btn.disabled = false; btn.textContent = 'Darme de alta'; zonaMsg.appendChild(aviso('error', err.mensaje)); });
+    } }, [
+      campo('Nombre', nombre), campo('Apellidos', apellidos), campo('Email', email, 'Te enviaremos un código para confirmarlo.'),
+      campo('Teléfono', tel), campo('Fecha de nacimiento', nac),
+      h('label', { clase: 'casilla', for: 'privacidad' }, [acepto, textoPriv]),
+      btn, zonaMsg
+    ]);
+    pintar([
+      h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: function () { pantallaAcceso(email.value); } }),
+      h('div', { clase: 'cabecera' }, [h('h1', { texto: 'Darme de alta' })]),
+      h('p', { clase: 'subtitulo', texto: 'Cuando el club apruebe tu alta podrás apuntarte a las actividades.' }),
+      form
+    ], false);
+    setTimeout(function () { nombre.focus(); }, 50);
+  }
+
+  // ---------- gestión de usuarios del Boss (hito 1.2) ----------
+  var ESTADOS = { PENDIENTE: 'Pendiente', ACTIVO: 'Activo', RECHAZADO: 'Rechazado', BAJA_SOLICITADA: 'Baja pedida', BAJA: 'Baja' };
+  var gestion = { datos: null, filtro: 'PENDIENTE', detalle: null };
+
+  function vistaUsuarios() {
+    var caja = h('div', {}, [h('div', { clase: 'cargando', style: 'min-height:30vh', texto: 'Cargando personas…' })]);
+    var pintarCaja = function () { caja.innerHTML = ''; (gestion.detalle ? vistaDetalleUsuario() : vistaListaUsuarios()).forEach(function (n) { if (n) caja.appendChild(n); }); };
+    gestion.repintar = pintarCaja;
+    if (gestion.datos) pintarCaja();
+    Api.llamar('usuarios.listar').then(function (d) { actualizarGestion(d); }).catch(function (err) { caja.innerHTML = ''; caja.appendChild(aviso('error', err.mensaje)); });
+    return [caja];
+  }
+
+  function actualizarGestion(d) {
+    gestion.datos = d;
+    if (gestion.detalle) gestion.detalle = d.usuarios.filter(function (u) { return u.id === gestion.detalle.id; })[0] || null;
+    var pendientes = (d.cuenta.PENDIENTE || 0) + d.bajasSolicitadas.length;
+    if (estado.inicio) { estado.inicio.avisos = estado.inicio.avisos || {}; estado.inicio.avisos.usuarios = pendientes; Api.guardarInicio(estado.inicio); pintarPestanas(); }
+    if (gestion.repintar && estado.pestana === 'usuarios') gestion.repintar();
+  }
+
+  function vistaListaUsuarios() {
+    var d = gestion.datos;
+    var grupos = { PENDIENTE: ['PENDIENTE'], ACTIVO: ['ACTIVO'], BAJA: ['BAJA', 'BAJA_SOLICITADA', 'RECHAZADO'] };
+    var etiquetas = [['PENDIENTE', 'Pendientes'], ['ACTIVO', 'Activos'], ['BAJA', 'Bajas']];
+    var seg = h('div', { clase: 'segmento', role: 'group', 'aria-label': 'Filtrar' }, etiquetas.map(function (e) {
+      var n = d.usuarios.filter(function (u) { return grupos[e[0]].indexOf(u.estado) >= 0; }).length;
+      return h('button', { type: 'button', 'aria-pressed': gestion.filtro === e[0] ? 'true' : 'false', texto: e[1] + ' · ' + n, alClick: function () { gestion.filtro = e[0]; gestion.repintar(); } });
+    }));
+    var lista = d.usuarios.filter(function (u) { return grupos[gestion.filtro].indexOf(u.estado) >= 0; });
+    var nodos = [seg];
+    if (d.bajasSolicitadas.length) {
+      nodos.push(h('p', { clase: 'seccion', texto: 'Bajas pedidas por coaches' }));
+      nodos.push(h('div', { clase: 'grupo' }, d.bajasSolicitadas.map(function (b) {
+        return h('div', { clase: 'fila', style: 'flex-wrap:wrap' }, [
+          h('div', { clase: 'principal' }, [h('span', { texto: b.usuario }), h('small', { texto: 'Pedida por ' + b.solicitada_por + (b.motivo ? ' · ' + b.motivo : '') })]),
+          h('div', { clase: 'acciones', style: 'width:100%' }, [
+            botonAccion('Confirmar baja', 'peligro', function () { return Api.llamar('usuarios.resolverBaja', { bajaId: b.id, aprobar: true }); }),
+            botonAccion('Denegar', 'secundario', function () { return Api.llamar('usuarios.resolverBaja', { bajaId: b.id, aprobar: false }); })
+          ])
+        ]);
+      })));
+    }
+    if (!lista.length) {
+      nodos.push(h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: gestion.filtro === 'PENDIENTE' ? 'No hay altas pendientes.' : 'No hay nadie en esta lista.' })]));
+      return nodos;
+    }
+    nodos.push(h('div', { clase: 'grupo' }, lista.map(function (u) {
+      return h('button', { clase: 'fila', type: 'button', alClick: function () { gestion.detalle = u; gestion.repintar(); } }, [
+        h('div', { clase: 'principal' }, [h('span', { texto: (u.nombre + ' ' + u.apellidos).trim() }), h('small', { texto: u.email })]),
+        h('span', { clase: 'etiqueta', texto: u.estado === 'ACTIVO' ? (NOMBRES_ROL[u.rol] || u.rol) : ESTADOS[u.estado] })
+      ]);
+    })));
+    return nodos;
+  }
+
+  function fechaLegible(iso) {
+    if (!iso) return '—';
+    var p = iso.slice(0, 10).split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+  }
+
+  function vistaDetalleUsuario() {
+    var u = gestion.detalle;
+    var filaDato = function (k, v, enlace) { return h('div', { clase: 'fila' }, [h('span', { texto: k }), enlace ? h('a', { href: enlace, clase: 'valor', texto: v }) : h('span', { clase: 'valor', texto: v })]); };
+    var nodos = [
+      h('button', { clase: 'volver', type: 'button', texto: '‹ Personas', alClick: function () { gestion.detalle = null; gestion.repintar(); } }),
+      h('p', { clase: 'seccion', texto: ESTADOS[u.estado] || u.estado }),
+      h('div', { clase: 'grupo' }, [
+        filaDato('Nombre', (u.nombre + ' ' + u.apellidos).trim()),
+        filaDato('Email', u.email, 'mailto:' + u.email),
+        filaDato('Teléfono', u.telefono || '—', u.telefono ? 'tel:' + u.telefono : null),
+        filaDato('Nacimiento', fechaLegible(u.fecha_nacimiento)),
+        filaDato('Alta', fechaLegible(u.creado)),
+        filaDato('Rol', NOMBRES_ROL[u.rol] || u.rol)
+      ])
+    ];
+    var selectorRol = h('select', { id: 'rol', 'aria-label': 'Rol' }, ['USUARIO', 'COACH', 'BOSS'].map(function (r) { return h('option', { value: r, selected: r === u.rol, texto: NOMBRES_ROL[r] }); }));
+    if (u.estado === 'PENDIENTE') {
+      nodos.push(h('p', { clase: 'seccion', texto: 'Aprobar como' }), selectorRol);
+      nodos.push(h('div', { clase: 'acciones' }, [
+        botonAccion('Aprobar', '', function () { return Api.llamar('usuarios.aprobar', { id: u.id, rol: selectorRol.value }); }),
+        botonAccion('Rechazar', 'peligro', function () { return confirm('¿Rechazar el alta de ' + u.nombre + '?') && Api.llamar('usuarios.rechazar', { id: u.id }); })
+      ]));
+    } else if (u.estado === 'ACTIVO') {
+      nodos.push(h('p', { clase: 'seccion', texto: 'Rol' }), selectorRol);
+      nodos.push(botonAccion('Guardar rol', 'secundario', function () { return Api.llamar('usuarios.cambiarRol', { id: u.id, rol: selectorRol.value }); }));
+      nodos.push(botonAccion('Dar de baja del club', 'peligro', function () {
+        var motivo = prompt('Motivo de la baja (opcional):', '');
+        return motivo !== null && Api.llamar('usuarios.bajaClub', { id: u.id, motivo: motivo });
+      }));
+    } else {
+      nodos.push(botonAccion('Reactivar', '', function () { return Api.llamar('usuarios.reactivar', { id: u.id }); }));
+    }
+    return nodos;
+  }
+
+  /** Botón que llama al servidor, muestra "Guardando…" y actualiza la lista con la respuesta. */
+  function botonAccion(texto, clase, accion) {
+    var zona = h('div', {});
+    var b = h('button', { clase: 'boton ' + (clase || ''), type: 'button', texto: texto, alClick: function () {
+      var promesa = accion();
+      if (!promesa) return; // cancelado
+      b.disabled = true; b.textContent = 'Guardando…'; zona.innerHTML = '';
+      promesa.then(function (d) { actualizarGestion(d); })
+        .catch(function (err) { b.disabled = false; b.textContent = texto; zona.appendChild(aviso('error', err.mensaje)); });
+    } });
+    return h('div', { style: 'flex:1' }, [b, zona]);
+  }
+
   // ---------- cuenta pendiente ----------
   function pantallaPendiente(inicio) {
     var u = inicio.usuario;
@@ -126,14 +275,25 @@
     if (inicio.usuario.estado !== 'ACTIVO') return pantallaPendiente(inicio);
     var menu = inicio.menu || [];
     if (!estado.pestana || !menu.some(function (m) { return m.id === estado.pestana; })) estado.pestana = menu.length ? menu[0].id : 'perfil';
-    $pestanasInt.innerHTML = '';
-    menu.forEach(function (m) {
-      $pestanasInt.appendChild(h('button', { type: 'button', 'aria-current': m.id === estado.pestana ? 'page' : false, alClick: function () { estado.pestana = m.id; mostrarInicio(estado.inicio); } }, [icono(m.icono), h('span', { texto: m.titulo })]));
-    });
+    pintarPestanas();
     var actual = menu.filter(function (m) { return m.id === estado.pestana; })[0] || { id: 'perfil', titulo: 'Perfil' };
     var u = inicio.usuario;
     var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), h('div', { clase: 'avatar', 'aria-hidden': 'true', texto: iniciales(u) })]);
-    pintar([cabecera].concat(actual.id === 'perfil' ? vistaPerfil(inicio) : vistaProximamente(actual)), true);
+    var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios() : vistaProximamente(actual);
+    pintar([cabecera].concat(vista), true);
+  }
+
+  function pintarPestanas() {
+    var menu = (estado.inicio && estado.inicio.menu) || [];
+    var avisos = (estado.inicio && estado.inicio.avisos) || {};
+    $pestanasInt.innerHTML = '';
+    menu.forEach(function (m) {
+      var n = avisos[m.id] || 0;
+      $pestanasInt.appendChild(h('button', { type: 'button', 'aria-current': m.id === estado.pestana ? 'page' : false,
+        'aria-label': m.titulo + (n ? ', ' + n + ' pendientes' : ''),
+        alClick: function () { if (m.id !== 'usuarios') gestion.detalle = null; estado.pestana = m.id; mostrarInicio(estado.inicio); } },
+        [icono(m.icono), h('span', { texto: m.titulo }), n ? h('span', { clase: 'insignia', 'aria-hidden': 'true', texto: String(n) }) : null]));
+    });
   }
 
   function vistaPerfil(inicio) {

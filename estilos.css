@@ -52,3 +52,22 @@ input.codigo { letter-spacing: 10px; font-size: 26px; text-align: center; }
 
 .cargando { display: grid; place-items: center; min-height: 60vh; color: var(--color-texto-suave); }
 .oculto { display: none !important; }
+
+/* ---- hito 1.2: alta y gestión de usuarios ---- */
+.insignia { position: absolute; top: 6px; margin-left: 18px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--color-error); color: #fff; font-size: 11px; line-height: 18px; font-weight: 700; }
+.pestanas button { position: relative; }
+.segmento { display: flex; padding: 3px; border-radius: 12px; background: var(--color-control); margin-bottom: 12px; }
+.segmento button { flex: 1; min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: var(--color-texto-suave); font-weight: 600; font-size: 14px; }
+.segmento button[aria-pressed=true] { background: var(--color-tarjeta); color: var(--color-texto); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+button.fila { width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; }
+.fila .principal { display: flex; flex-direction: column; min-width: 0; }
+.fila .principal small { color: var(--color-texto-suave); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.campo { margin-bottom: 14px; }
+select { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--color-linea); background: var(--color-fondo); color: var(--color-texto); font: inherit; }
+input[type=tel], input[type=date] { width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--color-linea); background: var(--color-fondo); }
+.casilla { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; font-size: 14px; color: var(--color-texto-suave); }
+.casilla input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--color-acento); }
+.acciones { display: flex; gap: 8px; }
+.acciones .boton { margin-top: 12px; }
+.boton.peligro { background: var(--color-error-suave); color: var(--color-error); }
+.volver { background: none; border: 0; color: var(--color-acento); font-weight: 600; padding: 8px 4px; min-height: 44px; }
