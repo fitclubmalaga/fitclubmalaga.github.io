@@ -47,6 +47,26 @@
   function iniciales(u) { return ((u.nombre || '?')[0] + ((u.apellidos || '')[0] || '')).toUpperCase(); }
   var NOMBRES_ROL = { USUARIO: 'Cliente', COACH: 'Coach', BOSS: 'Boss' };
 
+
+  // ---------- bienvenida: dos caminos claros ----------
+  function pantallaBienvenida() {
+    var opcion = function (titulo, texto, clase, fn) {
+      return h('button', { clase: 'opcion ' + clase, type: 'button', alClick: fn }, [h('strong', { texto: titulo }), h('span', { texto: texto })]);
+    };
+    pintar([
+      h('div', { clase: 'marca' }, [h('div', { clase: 'logo', 'aria-hidden': 'true', texto: 'F' }), h('h1', { texto: 'Fitclub Málaga' }), h('p', { texto: 'Entrenamientos al aire libre' })]),
+      opcion('Ya soy socio', 'Entra con tu email: te enviaremos un código.', 'principal', function () { pantallaAcceso(); }),
+      opcion('Es mi primera vez', 'Date de alta en 3 pasos: tus datos, confirmar tu email y la aprobación del club.', '', function () { pantallaAlta(); })
+    ], false);
+  }
+
+  function pasos(actual) {
+    var nombres = ['Tus datos', 'Confirma tu email', 'Aprobación del club'];
+    return h('ol', { clase: 'pasos', 'aria-label': 'Paso ' + actual + ' de 3' }, nombres.map(function (n, i) {
+      return h('li', { clase: i + 1 === actual ? 'actual' : (i + 1 < actual ? 'hecho' : ''), 'aria-current': i + 1 === actual ? 'step' : false }, [h('span', { clase: 'num', texto: String(i + 1) }), h('span', { texto: n })]);
+    }));
+  }
+
   // ---------- acceso por código ----------
   function pantallaAcceso(emailPrevio, mensaje) {
     var email = h('input', { type: 'email', id: 'email', autocomplete: 'email', inputmode: 'email', placeholder: 'nombre@correo.com', value: emailPrevio || '' });
@@ -64,9 +84,10 @@
       });
     } }, [h('label', { for: 'email', texto: 'Tu email' }), email, btn, zonaMsg]);
     pintar([
-      h('div', { clase: 'marca' }, [h('div', { clase: 'logo', 'aria-hidden': 'true', texto: 'F' }), h('h1', { texto: 'Fitclub Málaga' }), h('p', { texto: 'Entra con tu email. Te enviaremos un código.' })]),
-      form,
-      h('button', { clase: 'boton secundario', type: 'button', style: 'margin-top:16px', texto: '¿Eres nuevo? Darme de alta', alClick: function () { pantallaAlta(email.value); } })
+      h('button', { clase: 'volver', type: 'button', texto: '‹ Inicio', alClick: pantallaBienvenida }),
+      h('div', { clase: 'cabecera' }, [h('h1', { texto: 'Entrar' })]),
+      h('p', { clase: 'subtitulo', texto: 'Escribe el email con el que te diste de alta. Te enviaremos un código de 6 cifras.' }),
+      form
     ], false);
     setTimeout(function () { email.focus(); }, 50);
   }
@@ -90,7 +111,7 @@
       h('label', { for: 'codigo', texto: 'Código de 6 cifras' }), codigo,
       h('p', { id: 'ayudaCodigo', clase: 'subtitulo', style: 'margin:8px 0 0', texto: 'Enviado a ' + email + '. Caduca en 10 minutos.' }),
       btn, zonaMsg,
-      h('button', { clase: 'boton enlace', type: 'button', texto: 'Cambiar de email o pedir otro código', alClick: function () { pantallaAcceso(email); } })
+      desdeAlta ? null : h('button', { clase: 'boton enlace', type: 'button', texto: 'Cambiar de email o pedir otro código', alClick: function () { pantallaAcceso(email); } })
     ]);
     // Quien escribe un email nuevo en "Entrar" no recibe nada (para no revelar quién es socio): se le orienta al alta.
     var ayudaAlta = desdeAlta ? null : h('div', { clase: 'tarjeta', style: 'margin-top:12px' }, [
@@ -98,7 +119,8 @@
       h('button', { clase: 'boton secundario', type: 'button', texto: 'Es mi primera vez: darme de alta', alClick: function () { pantallaAlta(email); } })
     ]);
     pintar([
-      h('div', { clase: 'marca' }, [h('div', { clase: 'logo', 'aria-hidden': 'true', texto: 'F' }), h('h1', { texto: 'Revisa tu correo' })]),
+      desdeAlta ? pasos(2) : null,
+      h('div', { clase: 'cabecera' }, [h('h1', { texto: desdeAlta ? 'Confirma tu email' : 'Revisa tu correo' })]),
       form, ayudaAlta
     ], false);
     setTimeout(function () { codigo.focus(); }, 50);
@@ -117,7 +139,7 @@
     var nac = h('input', { type: 'date', id: 'nacimiento', autocomplete: 'bday', max: new Date().toISOString().slice(0, 10) });
     var acepto = h('input', { type: 'checkbox', id: 'privacidad' });
     var textoPriv = h('span', { texto: 'Acepto que el club trate mis datos para gestionar mi alta y mis actividades.' });
-    var btn = h('button', { clase: 'boton', type: 'submit', texto: 'Darme de alta' });
+    var btn = h('button', { clase: 'boton', type: 'submit', texto: 'Continuar' });
     var zonaMsg = h('div', {});
     Api.llamar('alta.textoPrivacidad').then(function (d) { if (d && d.texto) textoPriv.textContent = d.texto; }).catch(function () {});
     var form = h('form', { clase: 'tarjeta', novalidate: true, alSubmit: function (ev) {
@@ -126,7 +148,7 @@
       btn.disabled = true; btn.textContent = 'Enviando…';
       Api.llamar('alta.registrar', { nombre: nombre.value, apellidos: apellidos.value, email: email.value, telefono: tel.value, fecha_nacimiento: nac.value, acepta_privacidad: acepto.checked })
         .then(function (d) { pantallaCodigo(email.value.trim(), d.mensaje, true); })
-        .catch(function (err) { btn.disabled = false; btn.textContent = 'Darme de alta'; zonaMsg.appendChild(aviso('error', err.mensaje)); });
+        .catch(function (err) { btn.disabled = false; btn.textContent = 'Continuar'; zonaMsg.appendChild(aviso('error', err.mensaje)); });
     } }, [
       campo('Nombre', nombre), campo('Apellidos', apellidos), campo('Email', email, 'Te enviaremos un código para confirmarlo.'),
       campo('Teléfono', tel), campo('Fecha de nacimiento', nac),
@@ -134,9 +156,10 @@
       btn, zonaMsg
     ]);
     pintar([
-      h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: function () { pantallaAcceso(email.value); } }),
-      h('div', { clase: 'cabecera' }, [h('h1', { texto: 'Darme de alta' })]),
-      h('p', { clase: 'subtitulo', texto: 'Cuando el club apruebe tu alta podrás apuntarte a las actividades.' }),
+      h('button', { clase: 'volver', type: 'button', texto: '‹ Inicio', alClick: pantallaBienvenida }),
+      pasos(1),
+      h('div', { clase: 'cabecera' }, [h('h1', { texto: 'Tus datos' })]),
+      h('p', { clase: 'subtitulo', texto: 'Después te enviaremos un código para confirmar tu email, y el club revisará tu alta.' }),
       form
     ], false);
     setTimeout(function () { nombre.focus(); }, 50);
@@ -256,10 +279,11 @@
   function pantallaPendiente(inicio) {
     var u = inicio.usuario;
     var texto = u.estado === 'PENDIENTE'
-      ? 'El club tiene que revisar y aprobar tu alta. Cuando esté aprobada, al abrir la app verás las actividades.'
+      ? 'Tu email está confirmado. Ahora el club revisará tu alta; te avisaremos por correo cuando esté aprobada y podrás apuntarte a las actividades.'
       : 'Tu cuenta está en revisión. Si tienes dudas, habla con el club.';
     pintar([
-      h('div', { clase: 'vacio tarjeta', style: 'margin-top:32px' }, [icono('reloj', 40), h('h2', { texto: 'Hola, ' + (u.nombre || '') }), h('p', { texto: texto })]),
+      u.estado === 'PENDIENTE' ? pasos(3) : null,
+      h('div', { clase: 'vacio tarjeta', style: 'margin-top:16px' }, [icono('reloj', 40), h('h2', { texto: 'Hola, ' + (u.nombre || '') }), h('p', { texto: texto })]),
       h('button', { clase: 'boton secundario', type: 'button', texto: 'Comprobar de nuevo', alClick: arrancar }),
       botonSalir()
     ], false);
@@ -326,7 +350,7 @@
   function botonSalir() {
     return h('button', { clase: 'boton secundario', type: 'button', texto: 'Cerrar sesión en este móvil', alClick: function (ev) {
       ev.target.disabled = true;
-      var fin = function () { Api.olvidarSesion(); estado.pestana = null; pantallaAcceso(); };
+      var fin = function () { Api.olvidarSesion(); estado.pestana = null; pantallaBienvenida(); };
       Api.llamar('acceso.cerrarSesion').then(fin, fin);
     } });
   }
@@ -338,7 +362,7 @@
 
   // ---------- arranque ----------
   function arrancar() {
-    if (!Api.token()) return pantallaAcceso();
+    if (!Api.token()) return pantallaBienvenida();
     var guardado = Api.inicioGuardado();
     if (guardado) mostrarInicio(guardado); // pinta al instante con lo último conocido…
     Api.llamar('app.inicio').then(function (inicio) { // …y lo actualiza con el servidor

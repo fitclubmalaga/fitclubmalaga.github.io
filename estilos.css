@@ -71,3 +71,16 @@ input[type=tel], input[type=date] { width: 100%; padding: 13px 14px; border-radi
 .acciones .boton { margin-top: 12px; }
 .boton.peligro { background: var(--color-error-suave); color: var(--color-error); }
 .volver { background: none; border: 0; color: var(--color-acento); font-weight: 600; padding: 8px 4px; min-height: 44px; }
+
+/* ---- bienvenida y pasos del alta ---- */
+.opcion { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; padding: 18px; margin-bottom: 12px; border: 0; border-radius: var(--radio); background: var(--color-tarjeta); color: var(--color-texto); }
+.opcion strong { font-size: 18px; }
+.opcion span { color: var(--color-texto-suave); font-size: 15px; }
+.opcion.principal { background: var(--color-acento); color: var(--color-acento-texto); }
+.opcion.principal span { color: var(--color-acento-texto); opacity: .9; }
+.pasos { list-style: none; display: flex; gap: 6px; margin: 4px 0 16px; padding: 0; }
+.pasos li { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--color-texto-suave); }
+.pasos li::before { content: ""; height: 4px; border-radius: 2px; background: var(--color-linea); }
+.pasos li.hecho::before, .pasos li.actual::before { background: var(--color-acento); }
+.pasos li.actual { color: var(--color-texto); font-weight: 600; }
+.pasos .num { display: none; }
