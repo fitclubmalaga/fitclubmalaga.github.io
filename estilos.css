@@ -112,3 +112,16 @@ input[type=time], input[type=number] { width: 100%; padding: 12px 10px; border-r
 .casilla.eleccion input:disabled + span { opacity: .5; }
 a.mapa { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 600; color: var(--color-acento); text-decoration: none; white-space: nowrap; }
 .fila a.mapa { align-self: center; flex: none; }
+/* Lugares: tarjeta grande con la miniatura del mapa a la derecha (21-11) */
+.tarjeta.lugar { display: grid; grid-template-columns: minmax(0, 1fr) 46%; padding: 0; overflow: hidden; margin-top: 12px; min-height: 150px; }
+.tarjeta.lugar.inactivo { opacity: .65; }
+.lugar-datos { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 12px 14px 16px; border: 0; background: none; text-align: left; color: var(--color-texto); min-width: 0; }
+.lugar-datos strong { font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+.lugar-datos small { color: var(--color-texto-suave); font-size: 13px; line-height: 1.35; }
+.lugar-datos small.ok { color: var(--color-acento); }
+.lugar-editar { margin-top: auto; padding-top: 8px; font-size: 14px; font-weight: 600; color: var(--color-acento); }
+.lugar-mapa { position: relative; display: block; min-height: 150px; background: var(--color-control); }
+.lugar-mapa iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.lugar-mapa.vacio-mapa { border: 0; display: flex; align-items: center; justify-content: center; padding: 12px; text-align: center; font-size: 12px; color: var(--color-texto-suave); }
+.lugar-vista .lugar-mapa { height: 200px; border-radius: 12px; overflow: hidden; margin-bottom: 4px; }
+@media (min-width: 600px) { .tarjeta.lugar { min-height: 180px; } .lugar-mapa { min-height: 180px; } }
