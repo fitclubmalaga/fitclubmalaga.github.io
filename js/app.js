@@ -66,12 +66,12 @@
     pintar([
       h('div', { clase: 'marca' }, [h('div', { clase: 'logo', 'aria-hidden': 'true', texto: 'F' }), h('h1', { texto: 'Fitclub Málaga' }), h('p', { texto: 'Entra con tu email. Te enviaremos un código.' })]),
       form,
-      h('button', { clase: 'boton enlace', type: 'button', texto: '¿Eres nuevo? Darme de alta', alClick: function () { pantallaAlta(email.value); } })
+      h('button', { clase: 'boton secundario', type: 'button', style: 'margin-top:16px', texto: '¿Eres nuevo? Darme de alta', alClick: function () { pantallaAlta(email.value); } })
     ], false);
     setTimeout(function () { email.focus(); }, 50);
   }
 
-  function pantallaCodigo(email, mensaje) {
+  function pantallaCodigo(email, mensaje, desdeAlta) {
     var codigo = h('input', { type: 'text', id: 'codigo', clase: 'codigo', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6', placeholder: '••••••', 'aria-describedby': 'ayudaCodigo' });
     var btn = h('button', { clase: 'boton', type: 'submit', texto: 'Entrar' });
     var zonaMsg = h('div', {}, [aviso('ok', mensaje)]);
@@ -92,9 +92,14 @@
       btn, zonaMsg,
       h('button', { clase: 'boton enlace', type: 'button', texto: 'Cambiar de email o pedir otro código', alClick: function () { pantallaAcceso(email); } })
     ]);
+    // Quien escribe un email nuevo en "Entrar" no recibe nada (para no revelar quién es socio): se le orienta al alta.
+    var ayudaAlta = desdeAlta ? null : h('div', { clase: 'tarjeta', style: 'margin-top:12px' }, [
+      h('p', { style: 'margin:0', texto: '¿No te llega el código? Si es tu primera vez en el club, primero tienes que darte de alta.' }),
+      h('button', { clase: 'boton secundario', type: 'button', texto: 'Es mi primera vez: darme de alta', alClick: function () { pantallaAlta(email); } })
+    ]);
     pintar([
       h('div', { clase: 'marca' }, [h('div', { clase: 'logo', 'aria-hidden': 'true', texto: 'F' }), h('h1', { texto: 'Revisa tu correo' })]),
-      form
+      form, ayudaAlta
     ], false);
     setTimeout(function () { codigo.focus(); }, 50);
   }
@@ -120,7 +125,7 @@
       zonaMsg.innerHTML = '';
       btn.disabled = true; btn.textContent = 'Enviando…';
       Api.llamar('alta.registrar', { nombre: nombre.value, apellidos: apellidos.value, email: email.value, telefono: tel.value, fecha_nacimiento: nac.value, acepta_privacidad: acepto.checked })
-        .then(function (d) { pantallaCodigo(email.value.trim(), d.mensaje); })
+        .then(function (d) { pantallaCodigo(email.value.trim(), d.mensaje, true); })
         .catch(function (err) { btn.disabled = false; btn.textContent = 'Darme de alta'; zonaMsg.appendChild(aviso('error', err.mensaje)); });
     } }, [
       campo('Nombre', nombre), campo('Apellidos', apellidos), campo('Email', email, 'Te enviaremos un código para confirmarlo.'),
