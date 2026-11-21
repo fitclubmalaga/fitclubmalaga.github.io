@@ -27,7 +27,8 @@
     grupo: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5-4-6"/>',
     casa: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
     reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    correo: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>'
+    correo: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+    chev: '<path d="M9 6l6 6-6 6"/>'
   };
   function icono(nombre, tam) {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -308,7 +309,8 @@
     var actual = menu.filter(function (m) { return m.id === estado.pestana; })[0] || { id: 'perfil', titulo: 'Perfil' };
     var u = inicio.usuario;
     var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), h('div', { clase: 'avatar', 'aria-hidden': 'true', texto: iniciales(u) })]);
-    var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios() : vistaProximamente(actual);
+    var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios()
+      : actual.id === 'agenda' && window.VistaAgenda ? window.VistaAgenda(UI, u) : vistaProximamente(actual);
     pintar([cabecera].concat(vista), true);
   }
 
@@ -350,7 +352,7 @@
   function botonSalir() {
     return h('button', { clase: 'boton secundario', type: 'button', texto: 'Cerrar sesión en este móvil', alClick: function (ev) {
       ev.target.disabled = true;
-      var fin = function () { Api.olvidarSesion(); estado.pestana = null; pantallaBienvenida(); };
+      var fin = function () { Api.olvidarSesion(); estado.pestana = null; if (window.VistaAgenda) window.VistaAgenda.reiniciar(); pantallaBienvenida(); };
       Api.llamar('acceso.cerrarSesion').then(fin, fin);
     } });
   }
@@ -373,6 +375,9 @@
       if (!guardado) pantallaError(err.mensaje);
     });
   }
+
+  // Utilidades compartidas con las vistas de otros archivos (js/agenda.js…).
+  var UI = { h: h, icono: icono, aviso: aviso, campo: campo, Api: Api };
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   arrancar();

@@ -84,3 +84,22 @@ input[type=tel], input[type=date] { width: 100%; padding: 13px 14px; border-radi
 .pasos li.hecho::before, .pasos li.actual::before { background: var(--color-acento); }
 .pasos li.actual { color: var(--color-texto); font-weight: 600; }
 .pasos .num { display: none; }
+
+/* ---- hito 1.3: agenda ---- */
+.navsemana { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.navsemana button { width: 44px; height: 44px; border: 0; border-radius: 12px; background: var(--color-tarjeta); font-size: 22px; color: var(--color-acento); }
+.navsemana strong { font-size: 17px; }
+.fila.sesion { align-items: stretch; }
+.fila .hora { width: 50px; display: flex; flex-direction: column; flex: none; }
+.fila .hora small { color: var(--color-texto-suave); font-size: 13px; }
+.fila .barra { width: 3px; border-radius: 2px; background: var(--color-acento); flex: none; }
+.fila .barra.apagada { background: var(--color-linea); }
+.fila small.completa { color: var(--color-error); font-weight: 600; }
+.dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--color-linea); background: var(--color-fondo); color: var(--color-texto); font: inherit; resize: vertical; }
+input[type=time], input[type=number] { width: 100%; padding: 12px 10px; border-radius: 12px; border: 1px solid var(--color-linea); background: var(--color-fondo); color: var(--color-texto); font: inherit; }
+.franja { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 6px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-linea); align-items: center; }
+.franja select { grid-column: 1 / 3; grid-row: 1; }
+.franja .quitar { grid-column: 3; grid-row: 1; height: 44px; border: 0; border-radius: 10px; background: var(--color-control); color: var(--color-texto-suave); }
+.franja input[type=time] { grid-row: 2; }
+.franja input[type=time]:last-of-type { grid-column: 2 / 4; }
