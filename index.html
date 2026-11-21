@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Fitclub · Prueba técnica</title>
+<title>Fitclub Málaga</title>
 <meta name="theme-color" content="#C2410C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -12,222 +12,19 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="iconos/icono-180.png">
 <link rel="icon" href="iconos/icono-192.png">
-<style>
-  /* Tema "Agenda clara". Todos los colores en variables para retocarlos fácilmente. */
-  :root{--fondo:#F2F2F7;--tarjeta:#FFFFFF;--texto:#111111;--suave:#636366;--acento:#C2410C;--acento-suave:#FDEBE1;--ok:#15803D;--ok-suave:#E3F4E8;--error:#B91C1C;--error-suave:#FDE2E2;--linea:#E5E5EA}
-  @media (prefers-color-scheme:dark){:root{--fondo:#000000;--tarjeta:#1C1C1E;--texto:#F2F2F7;--suave:#A1A1A6;--acento:#FB923C;--acento-suave:#3A2414;--ok:#4ADE80;--ok-suave:#12301D;--error:#F87171;--error-suave:#3A1414;--linea:#2C2C2E}}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--fondo);color:var(--texto);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
-  main{max-width:520px;margin:0 auto;padding:20px 16px 48px}
-  h1{font-size:30px;margin:4px 4px 2px;letter-spacing:-.5px}
-  .sub{color:var(--suave);margin:0 4px 16px;font-size:14px}
-  .sec{font-size:13px;font-weight:600;color:var(--suave);text-transform:uppercase;letter-spacing:.4px;margin:20px 4px 6px}
-  .card{background:var(--tarjeta);border-radius:14px;padding:14px}
-  .fila{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--linea)}
-  .fila:first-child{border-top:0}
-  .fila span:last-child{font-weight:600;text-align:right}
-  label{display:block;font-size:14px;font-weight:600;margin:4px 0 6px}
-  input{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid var(--linea);background:var(--fondo);color:var(--texto)}
-  input.codigo{letter-spacing:8px;font-size:24px;text-align:center}
-  button{font:inherit;font-weight:600;border:0;border-radius:12px;min-height:46px;padding:0 16px;cursor:pointer;width:100%;margin-top:10px;background:var(--acento);color:#fff}
-  button.sec2{background:var(--fondo);color:var(--texto)}
-  button:disabled{opacity:.5}
-  .msg{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:14px;display:none}
-  .msg.ok{display:block;background:var(--ok-suave);color:var(--ok)}
-  .msg.err{display:block;background:var(--error-suave);color:var(--error)}
-  .msg.info{display:block;background:var(--acento-suave);color:var(--acento)}
-  ol{margin:0;padding-left:20px}li{margin:6px 0}
-  textarea{width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--linea);background:var(--fondo);color:var(--texto);min-height:70px}
-  .oculto{display:none}
-</style>
+<link rel="stylesheet" href="tema.css">
+<link rel="stylesheet" href="estilos.css">
 </head>
 <body>
-<main>
-  <h1>Prueba técnica</h1>
-  <p class="sub">Fitclub Málaga · hito 1.0 (versión web propia). Esto no es la app: solo comprueba que el acceso por código y la sesión funcionan en tu móvil.</p>
-
-  <p class="sec">1 · Este dispositivo</p>
-  <div class="card" id="dispositivo"></div>
-
-  <div id="bloqueLogin">
-    <p class="sec">2 · Entrar con código</p>
-    <div class="card">
-      <label for="email">Tu email</label>
-      <input id="email" type="email" autocomplete="email" inputmode="email" placeholder="nombre@correo.com">
-      <button id="btnPedir">Enviarme un código</button>
-      <div id="paso2" class="oculto">
-        <label for="codigo" style="margin-top:14px">Código de 6 cifras</label>
-        <input id="codigo" class="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
-        <button id="btnVerificar">Entrar</button>
-      </div>
-      <div id="msgLogin" class="msg" role="status"></div>
-    </div>
-  </div>
-
-  <div id="bloqueSesion" class="oculto">
-    <p class="sec">2 · Sesión</p>
-    <div class="card">
-      <div id="estadoSesion"></div>
-      <button class="sec2" id="btnSalir">Cerrar sesión en este móvil</button>
-    </div>
-
-    <p class="sec">3 · Rendimiento</p>
-    <div class="card">
-      <div id="rend"><p style="margin:0;color:var(--suave)">Mide los tiempos del servidor y de la hoja.</p></div>
-      <button id="btnRend">Medir ahora</button>
-    </div>
-
-    <p class="sec">4 · Comprobaciones a mano</p>
-    <div class="card">
-      <ol>
-        <li>Añade esta página a la pantalla de inicio. En iPhone: Safari → Compartir → «Añadir a pantalla de inicio». En Android: Chrome → ⋮ → «Añadir a pantalla de inicio».</li>
-        <li>Cierra todo y ábrela desde el icono nuevo. Debe decir «Sesión recordada».</li>
-        <li>Repite la apertura mañana y dentro de 7 días, y envía el informe cada vez.</li>
-      </ol>
-      <label for="notas" style="margin-top:12px">Notas (opcional)</label>
-      <textarea id="notas" placeholder="Por ejemplo: el correo llegó a spam, tardó 1 minuto…"></textarea>
-      <button id="btnInforme">Enviar informe de este móvil</button>
-      <div id="msgInforme" class="msg" role="status"></div>
-    </div>
-  </div>
-</main>
-
+<div class="app">
+  <main class="contenido" id="contenido" aria-live="polite">
+    <div class="cargando">Cargando…</div>
+  </main>
+  <nav class="pestanas oculto" id="pestanas" aria-label="Secciones"><div class="interior" id="pestanasInterior"></div></nav>
+</div>
+<noscript><p style="padding:20px">Fitclub necesita JavaScript activado.</p></noscript>
 <script src="config.js"></script>
-<script>
-  var CLAVE_TOKEN = 'fc_prueba_token';
-  var CLAVE_FECHA = 'fc_prueba_guardado';
-  var medidas = {};
-
-  function $(id) { return document.getElementById(id); }
-  // Llama a la API de Apps Script. text/plain evita la petición previa de CORS.
-  function llamar(accion) {
-    var args = Array.prototype.slice.call(arguments, 1);
-    var t0 = Date.now();
-    if (!window.FITCLUB_API || window.FITCLUB_API.indexOf('/exec') < 0) {
-      return Promise.reject(new Error('Falta la URL del servidor en config.js'));
-    }
-    return fetch(window.FITCLUB_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ accion: accion, args: args }),
-      redirect: 'follow'
-    }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    }).then(function (j) { medidas.idaVueltaMs = Date.now() - t0; return j; });
-  }
-  function mensaje(id, tipo, texto) { var m = $(id); m.className = 'msg ' + tipo; m.textContent = texto; }
-  function esc(v) { return String(v === undefined || v === null ? '' : v).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-  function fila(a, b) { return '<div class="fila"><span>' + esc(a) + '</span><span>' + esc(b) + '</span></div>'; }
-
-  // Almacenamiento: puede fallar o borrarse en algunos navegadores; por eso se prueba.
-  function almacen() {
-    try { localStorage.setItem('fc_test', '1'); localStorage.removeItem('fc_test'); return 'localStorage'; }
-    catch (e) { return 'no disponible'; }
-  }
-  function leerToken() { try { return localStorage.getItem(CLAVE_TOKEN); } catch (e) { return null; } }
-  function guardarToken(t) {
-    try { localStorage.setItem(CLAVE_TOKEN, t); localStorage.setItem(CLAVE_FECHA, String(Date.now())); return true; }
-    catch (e) { return false; }
-  }
-  function borrarToken() { try { localStorage.removeItem(CLAVE_TOKEN); localStorage.removeItem(CLAVE_FECHA); } catch (e) {} }
-  function edadDias() {
-    try { var f = Number(localStorage.getItem(CLAVE_FECHA)); return f ? ((Date.now() - f) / 86400000).toFixed(1) : ''; }
-    catch (e) { return ''; }
-  }
-  function modo() {
-    var standalone = false;
-    try { standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; } catch (e) {}
-    return standalone ? 'pantalla de inicio' : 'navegador';
-  }
-
-  function pintarDispositivo(info) {
-    medidas.almacenamiento = almacen();
-    medidas.modo = modo();
-    medidas.cuota = info ? info.cuotaCorreoRestante : '';
-    $('dispositivo').innerHTML =
-      fila('Almacenamiento', medidas.almacenamiento) +
-      fila('Abierta desde', medidas.modo) +
-      fila('Hora del servidor', info ? info.horaServidor : '…') +
-      fila('Correos que quedan hoy', info ? info.cuotaCorreoRestante : '…') +
-      fila('Ida y vuelta al servidor', medidas.idaVueltaMs ? medidas.idaVueltaMs + ' ms' : '…');
-  }
-
-  function mostrarSesion(r, recordada) {
-    medidas.sesionRecordada = recordada ? 'sí' : 'no';
-    medidas.edadTokenDias = edadDias();
-    $('bloqueLogin').classList.add('oculto');
-    $('bloqueSesion').classList.remove('oculto');
-    $('estadoSesion').innerHTML =
-      '<div class="msg ' + (recordada ? 'ok' : 'info') + '" style="margin:0 0 6px">' +
-      (recordada ? '✓ Sesión recordada: has entrado sin pedir código.' : '✓ Has entrado con el código.') + '</div>' +
-      fila('Cuenta', r.email) + fila('Token guardado hace', (medidas.edadTokenDias || '0') + ' días');
-  }
-
-  function mostrarLogin() {
-    $('bloqueSesion').classList.add('oculto');
-    $('bloqueLogin').classList.remove('oculto');
-  }
-
-  $('btnPedir').onclick = function () {
-    var b = this; b.disabled = true;
-    llamar('pedirCodigo', $('email').value).then(function (r) {
-      b.disabled = false;
-      if (!r.ok) return mensaje('msgLogin', 'err', r.error);
-      mensaje('msgLogin', 'ok', r.mensaje);
-      $('paso2').classList.remove('oculto'); $('codigo').focus();
-    }).catch(function (e) { b.disabled = false; mensaje('msgLogin', 'err', 'Error del servidor: ' + e.message); });
-  };
-
-  $('btnVerificar').onclick = function () {
-    var b = this; b.disabled = true;
-    llamar('verificarCodigo', $('email').value, $('codigo').value).then(function (r) {
-      b.disabled = false;
-      if (!r.ok) return mensaje('msgLogin', 'err', r.error);
-      if (!guardarToken(r.token)) mensaje('msgLogin', 'err', 'Has entrado, pero este móvil no permite guardar la sesión.');
-      mostrarSesion(r, false);
-    }).catch(function (e) { b.disabled = false; mensaje('msgLogin', 'err', 'Error del servidor: ' + e.message); });
-  };
-
-  $('btnSalir').onclick = function () {
-    var t = leerToken(); borrarToken();
-    llamar('cerrarSesion', t).then(mostrarLogin, mostrarLogin);
-  };
-
-  $('btnRend').onclick = function () {
-    var b = this; b.disabled = true;
-    llamar('rendimiento', leerToken()).then(function (r) {
-      b.disabled = false;
-      if (!r.ok) { $('rend').textContent = r.error; return; }
-      medidas.escrituraMs = r.escritura_hoja_ms; medidas.lecturaMs = r.lectura_hoja_ms;
-      medidas.bloqueoMs = r.bloqueo_ms; medidas.hashMs = r.hash_1000_ms;
-      $('rend').innerHTML = fila('Ida y vuelta', medidas.idaVueltaMs + ' ms') + fila('Escribir 20 filas', r.escritura_hoja_ms + ' ms') +
-        fila('Leer la hoja', r.lectura_hoja_ms + ' ms') + fila('Esperar el bloqueo', r.bloqueo_ms + ' ms') + fila('1000 cálculos de hash', r.hash_1000_ms + ' ms');
-    }).catch(function (e) { b.disabled = false; $('rend').textContent = 'Error: ' + e.message; });
-  };
-
-  $('btnInforme').onclick = function () {
-    var b = this; b.disabled = true;
-    medidas.dispositivo = navigator.userAgent;
-    medidas.notas = $('notas').value;
-    llamar('guardarInforme', leerToken(), medidas).then(function (r) {
-      b.disabled = false;
-      mensaje('msgInforme', r.ok ? 'ok' : 'err', r.ok ? 'Informe guardado. ¡Gracias!' : r.error);
-    }).catch(function (e) { b.disabled = false; mensaje('msgInforme', 'err', 'Error: ' + e.message); });
-  };
-
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(function () {}); }
-
-  // Al abrir: datos del servidor y, si hay token guardado, comprobar si la sesión sigue viva.
-  pintarDispositivo(null);
-  llamar('info').then(function (info) {
-    pintarDispositivo(info);
-    var t = leerToken();
-    if (!t) return mostrarLogin();
-    return llamar('quienSoy', t).then(function (r) {
-      if (r.ok) mostrarSesion(r, true); else { borrarToken(); mostrarLogin(); }
-    });
-  }).catch(function (e) { pintarDispositivo(null); mensaje('msgLogin', 'err', 'No se pudo contactar con el servidor: ' + e.message); });
-</script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

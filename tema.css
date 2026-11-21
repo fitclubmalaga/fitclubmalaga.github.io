@@ -1,0 +1,40 @@
+/* ============================================================
+   TEMA "AGENDA CLARA" · Fitclub Málaga
+   Todos los colores de la app están aquí. Para retocarlos, cambia
+   solo los valores de este archivo (modo claro y modo oscuro).
+   Comprueba el contraste: el texto debe leerse bien al sol.
+   ============================================================ */
+:root {
+  --color-fondo: #F2F2F7;          /* fondo general */
+  --color-tarjeta: #FFFFFF;        /* tarjetas y listas */
+  --color-texto: #111111;          /* texto principal */
+  --color-texto-suave: #636366;    /* texto secundario */
+  --color-acento: #C2410C;         /* botones principales, pestaña activa */
+  --color-acento-texto: #FFFFFF;   /* texto sobre el acento */
+  --color-acento-suave: #FDEBE1;   /* fondos de avisos y etiquetas */
+  --color-ok: #15803D;
+  --color-ok-suave: #E3F4E8;
+  --color-error: #B91C1C;
+  --color-error-suave: #FDE2E2;
+  --color-linea: #E5E5EA;
+  --color-control: #E3E3E8;        /* fondo de campos y botones secundarios */
+  --radio: 14px;
+  --fuente: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-fondo: #000000;
+    --color-tarjeta: #1C1C1E;
+    --color-texto: #F2F2F7;
+    --color-texto-suave: #A1A1A6;
+    --color-acento: #FB923C;
+    --color-acento-texto: #111111;
+    --color-acento-suave: #3A2414;
+    --color-ok: #4ADE80;
+    --color-ok-suave: #12301D;
+    --color-error: #F87171;
+    --color-error-suave: #3A1414;
+    --color-linea: #2C2C2E;
+    --color-control: #2C2C2E;
+  }
+}
