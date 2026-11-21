@@ -105,7 +105,7 @@ input[type=time], input[type=number] { width: 100%; padding: 12px 10px; border-r
 .franja input[type=time]:last-of-type { grid-column: 2 / 4; }
 /* Hito 1.3 · Generar sesiones (elegir actividades) y «Cómo llegar» */
 .casilla.eleccion { padding: 10px 0; border-top: 1px solid var(--color-linea); color: var(--color-texto); }
-.casilla.eleccion:nth-child(2) { border-top: 0; }
+.tarjeta > p + .casilla.eleccion { border-top: 0; }
 .casilla.eleccion span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .casilla.eleccion strong { font-size: 16px; font-weight: 600; }
 .casilla.eleccion small { color: var(--color-texto-suave); font-size: 13px; }
@@ -124,3 +124,36 @@ a.mapa { display: inline-flex; align-items: center; min-height: 44px; font-size:
 .lugar-mapa iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
 .lugar-mapa.vacio-mapa { border: 0; display: flex; align-items: center; justify-content: center; padding: 8px; text-align: center; font-size: 11px; color: var(--color-texto-suave); }
 .lugar-vista .lugar-mapa { height: 180px; border-radius: 12px; overflow: hidden; margin-bottom: 4px; }
+.tarjeta > .casilla.eleccion:first-child { border-top: 0; }
+/* Filtro por sede (lugar) en la Semana */
+.filtro-sedes { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 10px; margin-bottom: 2px; scrollbar-width: none; }
+.filtro-sedes::-webkit-scrollbar { display: none; }
+.filtro-sedes button { flex: none; min-height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid var(--color-linea); background: var(--color-tarjeta); color: var(--color-texto); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.filtro-sedes button[aria-pressed=true] { background: var(--color-acento); border-color: var(--color-acento); color: var(--color-acento-texto); }
+.casilla.eleccion input[type=radio] { border-radius: 50%; }
+/* Fotos de las personas (foto o avatar) */
+.avatar { overflow: hidden; padding: 0; border: 0; }
+button.avatar { cursor: zoom-in; font-family: inherit; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar.mediano { width: 80px; height: 80px; font-size: 28px; margin: 4px auto 12px; }
+.avatar.mini { width: 36px; height: 36px; font-size: 13px; }
+.avatar.micro { width: 20px; height: 20px; font-size: 9px; display: inline-grid; vertical-align: middle; margin: -2px 2px 0 0; }
+small.con-coach { display: flex; align-items: center; gap: 0; }
+.perfil-foto { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 8px; }
+.perfil-foto .botones-foto { width: 100%; max-width: 420px; }
+.perfil-foto .botones-foto .boton { margin: 0; }
+.perfil-foto .subtitulo { margin: 6px 0 0; font-size: 13px; max-width: 420px; }
+/* Visor: la foto en grande */
+.visor { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; outline: 0; }
+.visor img { width: min(86vw, 420px); height: min(86vw, 420px); object-fit: cover; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+.visor p { color: #fff; font-size: 18px; font-weight: 600; margin: 16px 0 0; }
+.visor .cerrar { position: absolute; top: max(16px, env(safe-area-inset-top)); right: 16px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.15); color: #fff; font-size: 20px; }
+/* Selector de avatar dibujado */
+.selector-avatar { margin-bottom: 12px; text-align: center; }
+.rejilla-avatares { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 8px 0 12px; }
+.rejilla-avatares button { aspect-ratio: 1; border: 2px solid transparent; border-radius: 12px; background: var(--color-control); font-size: 22px; font-weight: 700; color: var(--color-texto); padding: 0; }
+.rejilla-avatares button[aria-pressed=true], .rejilla-colores button[aria-pressed=true] { border-color: var(--color-acento); }
+.rejilla-colores { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.rejilla-colores button { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--color-tarjeta); box-shadow: 0 0 0 1px var(--color-linea); padding: 0; }
+.rejilla-colores button[aria-pressed=true] { box-shadow: 0 0 0 3px var(--color-acento); }
+@media (max-width: 360px) { .rejilla-avatares { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

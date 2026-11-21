@@ -46,6 +46,114 @@
   }
   function aviso(tipo, texto) { return h('div', { clase: 'aviso ' + tipo, role: tipo === 'error' ? 'alert' : 'status', texto: texto }); }
   function iniciales(u) { return ((u.nombre || '?')[0] + ((u.apellidos || '')[0] || '')).toUpperCase(); }
+
+  // ---------- fotos de las personas (foto o avatar) ----------
+  // Todas las personas ven las fotos (decisión de Miguel, 21-11). Cada foto se identifica por una clave opaca k y una versión v.
+  // Se piden juntas (una llamada para todas las que falten) y se guardan en este navegador (las últimas 40).
+  var CLAVE_FOTOS = 'fitclub_fotos';
+  var fotos = (function () { try { return JSON.parse(localStorage.getItem(CLAVE_FOTOS) || '{}') || {}; } catch (e) { return {}; } })();
+  function guardarFotos() {
+    try {
+      var ks = Object.keys(fotos).sort(function (a, b) { return (fotos[b].t || 0) - (fotos[a].t || 0); });
+      ks.slice(40).forEach(function (k) { delete fotos[k]; });
+      localStorage.setItem(CLAVE_FOTOS, JSON.stringify(fotos));
+    } catch (e) { /* sin espacio o sin almacenamiento: se pedirán otra vez */ }
+  }
+  function fotoDe(f) { var c = f && fotos[f.k]; return c && c.v === f.v ? c.imagen : ''; }
+  function ponerFoto(k, v, imagen) {
+    if (imagen) fotos[k] = { v: v, imagen: imagen, t: Date.now() }; else delete fotos[k];
+    guardarFotos();
+    document.querySelectorAll('.avatar[data-k="' + k + '"]').forEach(function (el) { pintarCirculo(el, el._persona, imagen); });
+  }
+  var pendientes = {}, temporizador = null;
+  function pedirFoto(f) {
+    if (pendientes[f.k]) return;
+    pendientes[f.k] = f.v;
+    clearTimeout(temporizador);
+    temporizador = setTimeout(function () {
+      var claves = Object.keys(pendientes); pendientes = {};
+      Api.llamar('avatares.ver', { claves: claves }).then(function (d) {
+        Object.keys(d.fotos || {}).forEach(function (k) { ponerFoto(k, d.fotos[k].v, d.fotos[k].imagen); });
+      }).catch(function () { /* se quedan las iniciales */ });
+    }, 30);
+  }
+  function pintarCirculo(el, p, img) {
+    el.innerHTML = '';
+    if (img) el.appendChild(h('img', { src: img, alt: '' })); else el.textContent = iniciales(p);
+    el.classList.toggle('con-foto', !!img);
+  }
+  /**
+   * Círculo con la foto de una persona o sus iniciales. p = {nombre, apellidos, foto: {k, v} | null}.
+   * opciones.clase: tamaño (p. ej. 'mini', 'mediano'); opciones.ampliable: al tocarlo se ve en grande.
+   */
+  function circulo(p, opciones) {
+    opciones = opciones || {};
+    var f = p.foto;
+    var el = h(opciones.ampliable ? 'button' : 'div', { clase: 'avatar' + (opciones.clase ? ' ' + opciones.clase : ''), type: opciones.ampliable ? 'button' : null,
+      'aria-hidden': opciones.ampliable ? null : 'true', 'aria-label': opciones.ampliable ? 'Ver la foto de ' + (p.nombre || '') : null, 'data-k': f ? f.k : null });
+    el._persona = p;
+    var img = f ? fotoDe(f) : '';
+    pintarCirculo(el, p, img);
+    if (f && !img) pedirFoto(f);
+    if (opciones.ampliable) el.addEventListener('click', function (ev) {
+      ev.stopPropagation(); ev.preventDefault();
+      var actual = f ? fotoDe(f) : '';
+      if (actual) ampliar(actual, ((p.nombre || '') + ' ' + (p.apellidos || '')).trim());
+    });
+    return el;
+  }
+  /** Vista ampliada: la foto en grande sobre fondo oscuro. Se cierra tocando o con Escape. */
+  function ampliar(img, nombre) {
+    var capa = h('div', { clase: 'visor', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Foto de ' + nombre, tabindex: '-1' }, [
+      h('img', { src: img, alt: 'Foto de ' + nombre }), h('p', { texto: nombre }), h('button', { type: 'button', clase: 'cerrar', 'aria-label': 'Cerrar', texto: '✕' })
+    ]);
+    var cerrar = function () { capa.remove(); document.removeEventListener('keydown', tecla); };
+    var tecla = function (e) { if (e.key === 'Escape') cerrar(); };
+    capa.addEventListener('click', cerrar);
+    document.addEventListener('keydown', tecla);
+    document.body.appendChild(capa);
+    capa.focus();
+  }
+
+  /** Avatar dibujado: un dibujo o las iniciales sobre un color, pintado en el móvil y enviado como imagen. */
+  var AVATARES = ['Aa', '🏃', '🚴', '🏊', '🧘', '🏋️', '🤸', '⚽', '🎾', '🥊', '🧗', '🏄', '💪', '🔥', '⭐', '😎'];
+  var COLORES = ['#C2410C', '#0F1E31', '#0E7490', '#15803D', '#7C3AED', '#BE185D', '#CA8A04', '#475569'];
+  function dibujarAvatar(simbolo, color, texto, tam) {
+    var c = document.createElement('canvas'); c.width = c.height = tam;
+    var x = c.getContext('2d');
+    x.fillStyle = color; x.fillRect(0, 0, tam, tam);
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    if (simbolo === 'Aa') { x.fillStyle = '#fff'; x.font = '700 ' + Math.round(tam * 0.42) + 'px -apple-system, system-ui, sans-serif'; x.fillText(texto, tam / 2, tam / 2 + tam * 0.02); }
+    else { x.font = Math.round(tam * 0.55) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; x.fillText(simbolo, tam / 2, tam / 2 + tam * 0.04); }
+    return c.toDataURL('image/jpeg', 0.9);
+  }
+
+  /** Reduce la foto en el propio móvil: recorte cuadrado centrado de 320 px en JPEG (unos 20-30 KB). */
+  function reducirFoto(archivo) {
+    return new Promise(function (ok, mal) {
+      if (!archivo || !/^image\//.test(archivo.type || 'image/')) return mal(new Error('Elige una imagen.'));
+      var url = URL.createObjectURL(archivo);
+      var im = new Image();
+      im.onload = function () {
+        URL.revokeObjectURL(url);
+        var lado = Math.min(im.naturalWidth, im.naturalHeight);
+        if (!lado) return mal(new Error('No se ha podido leer la imagen.'));
+        var c = document.createElement('canvas');
+        var sx = (im.naturalWidth - lado) / 2, sy = (im.naturalHeight - lado) / 2;
+        for (var tam = 320, q = 0.85; tam >= 160; tam -= 32, q -= 0.05) {
+          c.width = c.height = tam;
+          var x = c.getContext('2d');
+          x.fillStyle = '#fff'; x.fillRect(0, 0, tam, tam);
+          x.drawImage(im, sx, sy, lado, lado, 0, 0, tam, tam);
+          var d = c.toDataURL('image/jpeg', q);
+          if (d.length <= 44000) return ok(d);
+        }
+        mal(new Error('La foto es demasiado grande. Prueba con otra.'));
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); mal(new Error('No se ha podido leer la imagen. Prueba con una foto JPEG o PNG.')); };
+      im.src = url;
+    });
+  }
   var NOMBRES_ROL = { USUARIO: 'Cliente', COACH: 'Coach', BOSS: 'Boss' };
 
 
@@ -215,7 +323,8 @@
     }
     nodos.push(h('div', { clase: 'grupo' }, lista.map(function (u) {
       return h('button', { clase: 'fila', type: 'button', alClick: function () { gestion.detalle = u; gestion.repintar(); } }, [
-        h('div', { clase: 'principal' }, [h('span', { texto: (u.nombre + ' ' + u.apellidos).trim() }), h('small', { texto: u.email })]),
+        circulo(u, { clase: 'mini' }),
+        h('div', { clase: 'principal', style: 'flex:1' }, [h('span', { texto: (u.nombre + ' ' + u.apellidos).trim() }), h('small', { texto: u.email })]),
         h('span', { clase: 'etiqueta', texto: u.estado === 'ACTIVO' ? (NOMBRES_ROL[u.rol] || u.rol) : ESTADOS[u.estado] })
       ]);
     })));
@@ -233,6 +342,7 @@
     var filaDato = function (k, v, enlace) { return h('div', { clase: 'fila' }, [h('span', { texto: k }), enlace ? h('a', { href: enlace, clase: 'valor', texto: v }) : h('span', { clase: 'valor', texto: v })]); };
     var nodos = [
       h('button', { clase: 'volver', type: 'button', texto: '‹ Personas', alClick: function () { gestion.detalle = null; gestion.repintar(); } }),
+      h('div', { clase: 'perfil-foto' }, [circulo(u, { clase: 'mediano', ampliable: true })]),
       h('p', { clase: 'seccion', texto: ESTADOS[u.estado] || u.estado }),
       h('div', { clase: 'grupo' }, [
         filaDato('Nombre', (u.nombre + ' ' + u.apellidos).trim()),
@@ -308,7 +418,7 @@
     pintarPestanas();
     var actual = menu.filter(function (m) { return m.id === estado.pestana; })[0] || { id: 'perfil', titulo: 'Perfil' };
     var u = inicio.usuario;
-    var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), h('div', { clase: 'avatar', 'aria-hidden': 'true', texto: iniciales(u) })]);
+    var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), circulo(u)]);
     var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios()
       : (actual.id === 'agenda' || (actual.id === 'sesiones' && u.rol === 'COACH')) && window.VistaAgenda ? window.VistaAgenda(UI, u) : vistaProximamente(actual);
     pintar([cabecera].concat(vista), true);
@@ -329,7 +439,55 @@
 
   function vistaPerfil(inicio) {
     var u = inicio.usuario;
+    var zona = h('div', {});
+    var panel = h('div', {});
+    var archivo = h('input', { type: 'file', id: 'fotoArchivo', accept: 'image/*', clase: 'oculto' });
+    var tiene = !!u.foto;
+    var bFoto = h('button', { clase: 'boton secundario', type: 'button', id: 'fotoCambiar', texto: tiene ? 'Cambiar foto' : 'Poner foto', alClick: function () { archivo.click(); } });
+    var bAvatar = h('button', { clase: 'boton secundario', type: 'button', id: 'avatarElegir', texto: 'Elegir un avatar', alClick: function () { panel.innerHTML = ''; panel.appendChild(selectorAvatar()); } });
+    var bQuitar = tiene ? h('button', { clase: 'boton enlace', type: 'button', id: 'fotoQuitar', texto: 'Quitar', alClick: function () {
+      if (confirm('¿Quitar tu foto?')) enviar('');
+    } }) : null;
+    function enviar(imagen) {
+      zona.innerHTML = ''; [bFoto, bAvatar].forEach(function (b) { b.disabled = true; }); bFoto.textContent = 'Guardando…';
+      Api.llamar('perfil.guardarAvatar', { imagen: imagen }).then(function (d) {
+        u.avatar_v = d.v; u.foto = d.v ? { k: d.k, v: d.v } : null;
+        ponerFoto(d.k, d.v, d.imagen);
+        mostrarInicio(estado.inicio);
+      }).catch(function (e) { [bFoto, bAvatar].forEach(function (b) { b.disabled = false; }); bFoto.textContent = tiene ? 'Cambiar foto' : 'Poner foto'; zona.appendChild(aviso('error', e.mensaje)); });
+    }
+    archivo.addEventListener('change', function () {
+      var f = archivo.files && archivo.files[0];
+      archivo.value = '';
+      if (!f) return;
+      zona.innerHTML = '';
+      reducirFoto(f).then(enviar).catch(function (e) { zona.appendChild(aviso('error', e.message)); });
+    });
+    function selectorAvatar() {
+      var elegido = { simbolo: AVATARES[1], color: COLORES[0] };
+      var vista = h('div', { clase: 'avatar mediano con-foto' });
+      var ini = iniciales(u);
+      function pintar() { vista.innerHTML = ''; vista.appendChild(h('img', { src: dibujarAvatar(elegido.simbolo, elegido.color, ini, 160), alt: '' })); }
+      var rejilla = h('div', { clase: 'rejilla-avatares', role: 'group', 'aria-label': 'Dibujo' }, AVATARES.map(function (a) {
+        return h('button', { type: 'button', 'aria-pressed': a === elegido.simbolo ? 'true' : 'false', 'aria-label': a === 'Aa' ? 'Tus iniciales' : 'Dibujo ' + a, texto: a === 'Aa' ? ini : a, alClick: function (ev) {
+          elegido.simbolo = a; rejilla.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); }); ev.currentTarget.setAttribute('aria-pressed', 'true'); pintar();
+        } });
+      }));
+      var colores = h('div', { clase: 'rejilla-colores', role: 'group', 'aria-label': 'Color' }, COLORES.map(function (c) {
+        return h('button', { type: 'button', style: 'background:' + c, 'aria-label': 'Color ' + c, 'aria-pressed': c === elegido.color ? 'true' : 'false', alClick: function (ev) {
+          elegido.color = c; colores.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); }); ev.currentTarget.setAttribute('aria-pressed', 'true'); pintar();
+        } });
+      }));
+      pintar();
+      return h('div', { clase: 'tarjeta selector-avatar' }, [vista, rejilla, colores,
+        h('button', { clase: 'boton', type: 'button', id: 'avatarUsar', texto: 'Usar este avatar', alClick: function () { enviar(dibujarAvatar(elegido.simbolo, elegido.color, ini, 320)); } }),
+        h('button', { clase: 'boton enlace', type: 'button', texto: 'Cancelar', alClick: function () { panel.innerHTML = ''; } })]);
+    }
     return [
+      h('div', { clase: 'perfil-foto' }, [circulo(u, { clase: 'mediano', ampliable: true }),
+        h('div', { clase: 'dos botones-foto' }, [bFoto, bAvatar]), bQuitar, archivo, zona,
+        h('p', { clase: 'subtitulo', texto: 'Una foto o un avatar, como prefieras. La verán las personas del club. Toca el círculo para verla en grande.' })]),
+      panel,
       h('p', { clase: 'seccion', texto: 'Tus datos' }),
       h('div', { clase: 'grupo' }, [
         h('div', { clase: 'fila' }, [h('span', { texto: 'Nombre' }), h('span', { clase: 'valor', texto: ((u.nombre || '') + ' ' + (u.apellidos || '')).trim() })]),
@@ -377,7 +535,7 @@
   }
 
   // Utilidades compartidas con las vistas de otros archivos (js/agenda.js…).
-  var UI = { h: h, icono: icono, aviso: aviso, campo: campo, Api: Api };
+  var UI = { h: h, icono: icono, aviso: aviso, campo: campo, Api: Api, circulo: circulo };
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   arrancar();

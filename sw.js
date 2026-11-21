@@ -1,6 +1,6 @@
 // Service worker mínimo: guarda la "carcasa" de la app para que abra rápido.
 // Nunca guarda respuestas del servidor (datos, sesiones).
-var CACHE = 'fitclub-v10';
+var CACHE = 'fitclub-v13';
 var CARCASA = ['./', 'index.html', 'tema.css', 'estilos.css', 'config.js', 'js/api.js', 'js/agenda.js', 'js/app.js', 'manifest.webmanifest', 'iconos/icono-192.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CARCASA); }).then(function () { return self.skipWaiting(); }));
