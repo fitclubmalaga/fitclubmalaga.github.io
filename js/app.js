@@ -420,7 +420,8 @@
     var u = inicio.usuario;
     var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), circulo(u)]);
     var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios()
-      : (actual.id === 'agenda' || (actual.id === 'sesiones' && u.rol === 'COACH')) && window.VistaAgenda ? window.VistaAgenda(UI, u) : vistaProximamente(actual);
+      : (actual.id === 'agenda' || (actual.id === 'sesiones' && u.rol === 'COACH')) && window.VistaAgenda ? window.VistaAgenda(UI, u)
+      : actual.id === 'reservas' && u.rol === 'USUARIO' && window.VistaReservas ? window.VistaReservas(UI, u) : vistaProximamente(actual);
     pintar([cabecera].concat(vista), true);
   }
 
@@ -510,7 +511,7 @@
   function botonSalir() {
     return h('button', { clase: 'boton secundario', type: 'button', texto: 'Cerrar sesión en este móvil', alClick: function (ev) {
       ev.target.disabled = true;
-      var fin = function () { Api.olvidarSesion(); estado.pestana = null; if (window.VistaAgenda) window.VistaAgenda.reiniciar(); pantallaBienvenida(); };
+      var fin = function () { Api.olvidarSesion(); estado.pestana = null; if (window.VistaAgenda) window.VistaAgenda.reiniciar(); if (window.VistaReservas) window.VistaReservas.reiniciar(); pantallaBienvenida(); };
       Api.llamar('acceso.cerrarSesion').then(fin, fin);
     } });
   }

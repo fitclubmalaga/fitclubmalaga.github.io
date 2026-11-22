@@ -1,13 +1,13 @@
 // Hito 1.3 · Pestaña Agenda.
 // Boss: Semana (generar, ajustar y cancelar sesiones) · Actividades (con horario semanal) · Lugares.
 // Coach (pestaña Sesiones): la semana y «Generar sesiones» de las actividades de sus lugares.
-// Cliente: la semana con lugar, hora, coach, plazas y «Cómo llegar» (las reservas llegan en el hito 1.4).
+// Cliente: la semana con lugar, hora, coach, plazas y «Cómo llegar»; reservar y cancelar su plaza (hito 1.4).
 (function () {
   'use strict';
   var DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   var DIAS_CORTOS = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  var ui = { modo: 'semana', desde: null, semana: null, gestion: null, opciones: null, resultado: null, editando: null };
+  var ui = { modo: 'semana', desde: null, semana: null, gestion: null, opciones: null, resultado: null, error: null, editando: null };
   // Sede elegida en el filtro de la Semana (se recuerda en este navegador; '' = todas).
   var sede = '';
   try { sede = localStorage.getItem('fitclub_sede') || ''; } catch (e) { sede = ''; }
@@ -28,6 +28,7 @@
     if (l.con_reservas) t += ' ' + plural(l.con_reservas, 'no se ha borrado porque tiene reservas', 'no se han borrado porque tienen reservas') + ': cancélalas en su lugar.';
     if (l.pasadas) t += ' ' + plural(l.pasadas, 'ya había pasado y no se toca', 'ya habían pasado y no se tocan') + '.';
     if (l.sin_cambio && l.operacion !== 'borrar') t += ' ' + plural(l.sin_cambio, 'ya estaba así', 'ya estaban así') + '.';
+    if (l.reservas_anuladas) t += ' ' + plural(l.reservas_anuladas, 'reserva anulada', 'reservas anuladas') + '; ' + plural(l.avisadas, 'persona avisada', 'personas avisadas') + ' por correo.';
     return t;
   }
   /** Suma meses a una fecha (31 ene + 1 mes = 28/29 feb). */
@@ -46,6 +47,14 @@
     ['1a', '1 año', function (d) { return sumarDias(sumarMeses(d, 12), -1); }],
     ['fin', 'Hasta una fecha (reto)', null]
   ];
+  /** Clave idempotente de una reserva: la misma para los reintentos de un mismo intento. */
+  function nuevaClave() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, ''); } catch (e) { /* sigue */ }
+    return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+  var clavesPendientes = {}; // sesion_id → clave mientras no haya respuesta correcta
+  window.FitclubReservas = { nuevaClave: nuevaClave };
+
   function textoPlazas(s) {
     if (s.cupo === '' || s.cupo === null) return { texto: 'Sin límite de plazas', clase: '' };
     if (s.libres === 0) return { texto: 'Completa', clase: 'completa' };
@@ -56,6 +65,7 @@
     var h = U.h, aviso = U.aviso;
     var esBoss = usuario.rol === 'BOSS';
     var puedeGenerar = esBoss || usuario.rol === 'COACH';
+    var esCliente = usuario.rol === 'USUARIO';
     var caja = h('div', {});
 
     function repintar() {
@@ -97,6 +107,7 @@
       if (puedeGenerar) nodos.push(h('button', { clase: 'boton', type: 'button', style: esBoss ? 'margin-bottom:8px' : 'margin-bottom:12px', texto: 'Generar sesiones', alClick: function () { ui.editando = function () { return editorGenerar(); }; repintar(); } }));
       if (esBoss) nodos.push(h('button', { clase: 'boton secundario', type: 'button', style: 'margin-bottom:12px', texto: 'Cancelar o borrar varias', alClick: function () { ui.editando = function () { return editorLote(); }; repintar(); } }));
       if (ui.resultado) { nodos.push(aviso('ok', ui.resultado)); ui.resultado = null; }
+      if (ui.error) { nodos.push(aviso('error', ui.error)); ui.error = null; }
       // Filtro por sede: solo si hay más de una.
       var sedes = d.lugares || [];
       if (sede && !sedes.some(function (l) { return l.id === sede; })) sede = '';
@@ -130,7 +141,7 @@
         nodos.push(h('p', { clase: 'seccion', texto: (f === d.hoy ? 'Hoy · ' : '') + ss[0].dia + ' ' + diaMes(f) }));
         nodos.push(h('div', { clase: 'grupo' }, ss.map(function (s) { return filaSesion(s); })));
       });
-      if (!puedeGenerar) nodos.push(h('p', { clase: 'subtitulo', style: 'text-align:center;margin-top:16px', texto: 'Muy pronto podrás reservar tu plaza desde aquí.' }));
+      if (esCliente) nodos.push(h('p', { clase: 'subtitulo', style: 'text-align:center;margin-top:16px', texto: 'Tus reservas, también en la pestaña «Reservas».' }));
       return nodos;
     }
 
@@ -143,14 +154,50 @@
         h('div', { clase: 'principal', style: 'flex:1' }, [
           h('span', { style: cancelada ? 'text-decoration:line-through' : '', texto: s.actividad }),
           h('small', { clase: 'con-coach' }, [s.lugar + (s.coach ? ' · ' : ''), s.coach ? U.circulo({ nombre: s.coach, apellidos: '', foto: s.coach_foto }, { clase: 'micro', ampliable: !esBoss }) : null, s.coach ? ' ' + s.coach : '']),
-          h('small', { clase: pl.clase, texto: cancelada ? 'Cancelada' : pl.texto + (s.ocupadas && s.cupo === '' ? ' · ' + s.ocupadas + ' apuntados' : '') })
+          h('small', { clase: pl.clase, texto: cancelada ? 'Cancelada' : pl.texto + (s.ocupadas && s.cupo === '' ? ' · ' + plural(s.ocupadas, 'apuntado', 'apuntados') : '') })
         ])
       ];
       if (!esBoss) {
-        if (s.mapa && !cancelada) contenido.push(h('a', { clase: 'mapa', href: s.mapa, target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Cómo llegar a ' + s.lugar, texto: 'Cómo llegar' }));
-        return h('div', { clase: 'fila sesion' }, contenido);
+        if (esCliente && s.mi && !cancelada) {
+          var acc = accionesReserva(s);
+          if (s.mapa) acc.appendChild(h('a', { clase: 'mapa', href: s.mapa, target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Cómo llegar a ' + s.lugar, texto: 'Cómo llegar' }));
+          contenido[2].appendChild(acc);
+        } else if (s.mapa && !cancelada) contenido.push(h('a', { clase: 'mapa', href: s.mapa, target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Cómo llegar a ' + s.lugar, texto: 'Cómo llegar' }));
+        return h('div', { clase: 'fila sesion' + (s.mi && s.mi.reserva ? ' reservada' : '') }, contenido);
       }
       return h('button', { clase: 'fila sesion', type: 'button', 'aria-label': 'Editar ' + s.actividad + ' ' + s.dia + ' ' + s.hora_inicio, alClick: function () { ui.editando = function () { return editorSesion(s); }; repintar(); } }, contenido.concat([U.icono('chev', 18)]));
+    }
+
+    // ------------------------------------------------ reservas del cliente (hito 1.4)
+    function accionesReserva(s) {
+      var mi = s.mi;
+      var caja2 = h('div', { clase: 'acciones-reserva' });
+      if (mi.reserva) {
+        caja2.appendChild(h('span', { clase: 'etiqueta ok', texto: 'Reservada ✓' }));
+        if (!mi.empezada) caja2.appendChild(h('button', { clase: 'boton-mini secundario', type: 'button', texto: 'Cancelar', 'aria-label': 'Cancelar mi plaza en ' + s.actividad + ' ' + s.dia + ' ' + s.hora_inicio, alClick: function (ev) {
+          var aviso1 = mi.tarde_si_cancela ? 'Faltan menos de ' + mi.horas_cancelacion + ' h: contará como cancelación tardía.\n\n' : '';
+          if (!confirm(aviso1 + '¿Cancelar tu plaza en ' + s.actividad + ' del ' + s.dia.toLowerCase() + ' ' + diaMes(s.fecha) + ' a las ' + s.hora_inicio + '?')) return;
+          var b = ev.currentTarget; b.disabled = true; b.textContent = 'Cancelando…';
+          U.Api.llamar('reservas.cancelar', { reserva_id: mi.reserva.id }).then(function (d) { ui.semana = d; ui.resultado = d.mensaje; repintar(); })
+            .catch(function (e) { ui.error = e.mensaje; repintar(); });
+        } }));
+        return caja2;
+      }
+      if (mi.empezada) return caja2;
+      if (mi.abre) { caja2.appendChild(h('small', { texto: 'Reservas desde el ' + diaMes(mi.abre) })); return caja2; }
+      if (s.libres === 0) return caja2;
+      caja2.appendChild(h('button', { clase: 'boton-mini', type: 'button', texto: 'Reservar', 'aria-label': 'Reservar ' + s.actividad + ' ' + s.dia + ' ' + s.hora_inicio, alClick: function (ev) {
+        var b = ev.currentTarget; b.disabled = true; b.textContent = 'Reservando…';
+        var clave = clavesPendientes[s.id] || (clavesPendientes[s.id] = nuevaClave());
+        U.Api.llamar('reservas.reservar', { sesion_id: s.id, clave: clave }).then(function (d) {
+          delete clavesPendientes[s.id]; ui.semana = d; ui.resultado = d.mensaje; repintar();
+        }).catch(function (e) {
+          // Si falló la red, se reintenta con la misma clave (no duplica). Si el servidor dijo que no, clave nueva.
+          if (e.codigo !== 'red' && e.codigo !== 'http') delete clavesPendientes[s.id];
+          ui.error = e.mensaje; repintar();
+        });
+      } }));
+      return caja2;
     }
 
     // ------------------------------------------------ generar sesiones (Boss: todos los lugares · Coach: los suyos)
@@ -235,13 +282,13 @@
       var zona = h('div', {});
       var guardar = function (datos, boton, textoBoton) {
         boton.disabled = true; boton.textContent = 'Guardando…'; zona.innerHTML = '';
-        U.Api.llamar('sesiones.editar', Object.assign({ id: s.id }, datos)).then(function (d) { ui.semana = d; ui.editando = null; repintar(); })
+        U.Api.llamar('sesiones.editar', Object.assign({ id: s.id }, datos)).then(function (d) { ui.semana = d; ui.editando = null; if (d.mensaje) ui.resultado = d.mensaje; repintar(); })
           .catch(function (e) { boton.disabled = false; boton.textContent = textoBoton; zona.appendChild(aviso('error', e.mensaje)); });
       };
       var bGuardar = h('button', { clase: 'boton', type: 'button', texto: 'Guardar cambios', alClick: function () { guardar({ hora_inicio: ini.value, hora_fin: fin.value, cupo: cupo.value, coach_id: coach.value }, bGuardar, 'Guardar cambios'); } });
       var cancelada = s.estado === 'CANCELADA';
       var bEstado = h('button', { clase: 'boton ' + (cancelada ? 'secundario' : 'peligro'), type: 'button', texto: cancelada ? 'Volver a programarla' : 'Cancelar esta sesión', alClick: function () {
-        if (!cancelada && !confirm('¿Cancelar ' + s.actividad + ' del ' + s.dia + ' ' + diaMes(s.fecha) + '?')) return;
+        if (!cancelada && !confirm('¿Cancelar ' + s.actividad + ' del ' + s.dia + ' ' + diaMes(s.fecha) + '?' + (s.ocupadas ? '\n\nTiene ' + s.ocupadas + (s.ocupadas === 1 ? ' persona apuntada: se le avisará' : ' personas apuntadas: se les avisará') + ' por correo y su reserva quedará anulada.' : ''))) return;
         guardar({ estado: cancelada ? 'PROGRAMADA' : 'CANCELADA' }, bEstado, bEstado.textContent);
       } });
       var bBorrar = h('button', { clase: 'boton secundario', type: 'button', style: 'margin-top:8px', texto: 'Borrar esta sesión', alClick: function () {
@@ -276,7 +323,7 @@
       }
       if (!op.lugares.length) return [volver, h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: 'No hay actividades activas.' })])];
       var marcadas = {};
-      var OPS = [['cancelar', 'Cancelarlas', 'Siguen en la agenda, tachadas. Se pueden volver a programar.'],
+      var OPS = [['cancelar', 'Cancelarlas', 'Siguen en la agenda, tachadas. Sus reservas se anulan y se avisa por correo. Se pueden volver a programar.'],
         ['borrar', 'Borrarlas', 'Desaparecen. Las que tengan reservas no se borran (cancélalas). Se pueden volver a generar.'],
         ['reactivar', 'Volver a programar las canceladas', 'Las canceladas del periodo vuelven a estar activas.']];
       var opElegida = 'cancelar';
@@ -462,5 +509,5 @@
     return [caja];
   };
 
-  window.VistaAgenda.reiniciar = function () { ui = { modo: 'semana', desde: null, semana: null, gestion: null, opciones: null, resultado: null, editando: null }; };
+  window.VistaAgenda.reiniciar = function () { ui = { modo: 'semana', desde: null, semana: null, gestion: null, opciones: null, resultado: null, error: null, editando: null }; };
 })();
