@@ -151,7 +151,7 @@
     var raiz = h('div', {});
     var cuerpo = h('div', {});
     function segmento() {
-      return h('div', { clase: 'segmento', role: 'group', 'aria-label': 'Sección' }, [['mias', 'Mis sesiones'], ['semana', 'Semana del club']].map(function (m) {
+      return h('div', { clase: 'segmento', role: 'group', 'aria-label': 'Sección' }, [['mias', 'Mis sesiones'], ['semana', 'Semana del club'], ['actividades', 'Mis actividades']].map(function (m) {
         return h('button', { type: 'button', 'aria-pressed': estado.modoCoach === m[0] ? 'true' : 'false', texto: m[1], alClick: function () { estado.modoCoach = m[0]; pintar(); } });
       }));
     }
@@ -166,6 +166,7 @@
       raiz.appendChild(cuerpo);
       cuerpo.innerHTML = '';
       if (estado.modoCoach === 'semana') { (window.VistaAgenda(U, usuario) || []).forEach(function (n) { cuerpo.appendChild(n); }); return; }
+      if (estado.modoCoach === 'actividades') { (window.VistaAgenda(U, usuario, { modo: 'actividades' }) || []).forEach(function (n) { cuerpo.appendChild(n); }); return; }
       if (estado.mias) dibujarMias(); else cuerpo.appendChild(h('div', { clase: 'cargando', style: 'min-height:20vh', texto: 'Cargando tus sesiones…' }));
       U.Api.llamar('coach.misSesiones').then(function (d) { estado.mias = d; if (estado.modoCoach === 'mias' && !estado.lista) dibujarMias(); })
         .catch(function (e) { cuerpo.appendChild(aviso('error', e.mensaje)); });
@@ -176,7 +177,7 @@
       var proximas = d.sesiones.filter(function (s) { return !s.pasada; });
       var pasadas = d.sesiones.filter(function (s) { return s.pasada; }).reverse();
       if (!d.sesiones.length) {
-        cuerpo.appendChild(h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: 'No tienes sesiones asignadas en estas dos semanas. Las verás aquí cuando el Boss te ponga como coach de alguna actividad.' })]));
+        cuerpo.appendChild(h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: 'No tienes sesiones en estas dos semanas. Crea tus actividades en «Mis actividades» y genera sus sesiones, o espera a que el Boss te asigne alguna.' })]));
         return;
       }
       var porDia = {};

@@ -577,6 +577,7 @@
   }
 
   // Utilidades compartidas con las vistas de otros archivos (js/agenda.js…).
+  if (window.FitclubActividad) window.FitclubActividad.api = Api; // para pedir las imágenes de las actividades
   var UI = { h: h, icono: icono, aviso: aviso, campo: campo, Api: Api, circulo: circulo,
     irA: function (id) { if (id !== 'usuarios') gestion.detalle = null; estado.pestana = id; mostrarInicio(estado.inicio); window.scrollTo(0, 0); } };
 

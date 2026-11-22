@@ -61,9 +61,12 @@
     return { texto: 'Quedan ' + s.libres + ' de ' + s.cupo, clase: '' };
   }
 
-  window.VistaAgenda = function (U, usuario) {
+  /** opciones.modo = 'actividades': solo «Mis actividades» (lo usa el coach desde su pestaña Sesiones). */
+  window.VistaAgenda = function (U, usuario, opciones) {
     var h = U.h, aviso = U.aviso;
     var esBoss = usuario.rol === 'BOSS';
+    var soloActividades = !!(opciones && opciones.modo === 'actividades');
+    if (soloActividades) ui.modo = 'actividades'; else if (!esBoss) ui.modo = 'semana';
     var puedeGenerar = esBoss || usuario.rol === 'COACH';
     var esCliente = usuario.rol === 'USUARIO';
     var caja = h('div', {});
@@ -399,21 +402,53 @@
       if (!g) return [];
       var lugares = {}; g.lugares.forEach(function (l) { lugares[l.id] = l.nombre; });
       var nodos = [];
-      if (!g.lugares.length) {
-        nodos.push(h('div', { clase: 'aviso info', texto: 'Primero crea al menos un lugar (pestaña Lugares).' }));
+      if (!g.lugares.some(function (l) { return l.activo; })) {
+        nodos.push(h('div', { clase: 'aviso info', texto: esBoss ? 'Primero crea al menos un lugar (pestaña Lugares).' : 'Aún no hay lugares activos: pídele al Boss que cree uno.' }));
         return nodos;
       }
+      if (ui.resultado) { nodos.push(aviso('ok', ui.resultado)); ui.resultado = null; }
+      if (!esBoss) nodos.push(h('p', { clase: 'subtitulo', style: 'margin:0 4px 4px', texto: 'Las actividades que creas tú. Las que te asigna el Boss las cambia él.' }));
       nodos.push(h('button', { clase: 'boton', type: 'button', texto: '+ Nueva actividad', alClick: function () { ui.editando = function () { return editorActividad(null); }; repintar(); } }));
-      if (!g.actividades.length) { nodos.push(h('div', { clase: 'vacio tarjeta', style: 'margin-top:12px' }, [h('p', { texto: 'Aún no hay actividades.' })])); return nodos; }
+      if (!g.actividades.length) { nodos.push(h('div', { clase: 'vacio tarjeta', style: 'margin-top:12px' }, [h('p', { texto: esBoss ? 'Aún no hay actividades.' : 'Aún no has creado ninguna actividad.' })])); return nodos; }
       nodos.push(h('div', { clase: 'grupo', style: 'margin-top:12px' }, g.actividades.map(function (a) {
         var franjas = a.horario.map(function (x) { return DIAS_CORTOS[x.dia_semana] + ' ' + x.hora_inicio; }).join(', ') || 'Sin horario';
         return h('button', { clase: 'fila', type: 'button', alClick: function () { ui.editando = function () { return editorActividad(a); }; repintar(); } }, [
           window.FitclubActividad.miniatura(h, a, 40),
-          h('div', { clase: 'principal' }, [h('span', { texto: a.nombre }), h('small', { texto: franjas }), h('small', { texto: (lugares[a.lugar_id] || '') + ' · ' + (a.cupo === '' ? 'sin límite' : a.cupo + ' plazas') })]),
+          h('div', { clase: 'principal' }, [h('span', { texto: a.nombre }), h('small', { texto: franjas }),
+            h('small', { texto: (lugares[a.lugar_id] || '') + (a.cupo === '' ? '' : ' · ' + a.cupo + ' plazas') + (esBoss && a.creado_por && a.creado_por !== 'ti' ? ' · creada por ' + a.creado_por : '') })]),
           a.activa ? U.icono('chev', 18) : h('span', { clase: 'etiqueta', texto: 'Inactiva' })
         ]);
       })));
       return nodos;
+    }
+
+    /** Borrar la actividad con todo lo suyo: primero muestra el recuento y pide escribir su nombre. */
+    function zonaBorrar(a) {
+      var caja = h('div', { clase: 'zona-peligro' });
+      var abrir = h('button', { clase: 'boton peligro', type: 'button', id: 'borrarActividad', texto: 'Borrar actividad…', alClick: function () {
+        abrir.disabled = true; abrir.textContent = 'Contando sesiones…';
+        U.Api.llamar('actividades.borrar', { id: a.id, simular: true }).then(function (r) {
+          caja.innerHTML = '';
+          var partes = [plural(r.sesiones, 'sesión', 'sesiones'), plural(r.reservas, 'reserva', 'reservas'), plural(r.asistencias, 'marca de asistencia', 'marcas de asistencia')];
+          caja.appendChild(h('p', { clase: 'borrar-resumen' }, ['Se borrará «', h('strong', { texto: r.nombre }), '» con ' + partes.join(', ') + '. No se puede deshacer.']));
+          if (r.futuras_con_reserva) caja.appendChild(aviso('error', plural(r.futuras_con_reserva, 'sesión próxima tiene', 'sesiones próximas tienen') + ' gente apuntada. No se les avisa: díselo tú antes.'));
+          var conf = h('input', { type: 'text', id: 'aConfirmar', autocomplete: 'off', placeholder: r.nombre });
+          caja.appendChild(U.campo('Para confirmar, escribe el nombre de la actividad', conf));
+          var zonaB = h('div', {});
+          var bSi = h('button', { clase: 'boton peligro', type: 'button', id: 'confirmarBorrar', texto: 'Borrar definitivamente', alClick: function () {
+            bSi.disabled = true; bSi.textContent = 'Borrando…'; zonaB.innerHTML = '';
+            U.Api.llamar('actividades.borrar', { id: a.id, confirmacion: conf.value }).then(function (d) {
+              ui.gestion = d; ui.opciones = null; ui.semana = null; ui.editando = null; ui.resultado = d.mensaje; repintar();
+            }).catch(function (e) { bSi.disabled = false; bSi.textContent = 'Borrar definitivamente'; zonaB.appendChild(aviso('error', e.mensaje)); });
+          } });
+          caja.appendChild(bSi);
+          caja.appendChild(h('button', { clase: 'boton secundario', type: 'button', texto: 'No borrar', alClick: function () { caja.parentNode.replaceChild(zonaBorrar(a), caja); } }));
+          caja.appendChild(zonaB);
+        }).catch(function (e) { abrir.disabled = false; abrir.textContent = 'Borrar actividad…'; caja.appendChild(aviso('error', e.mensaje)); });
+      } });
+      caja.appendChild(abrir);
+      caja.appendChild(h('p', { clase: 'subtitulo', style: 'margin-top:6px', texto: 'Borra también todas sus sesiones, reservas y listas. Útil para datos de prueba o errores; para dejar de usarla, mejor desmárcala como activa.' }));
+      return caja;
     }
 
     function editorActividad(a) {
@@ -421,8 +456,10 @@
       a = a || { nombre: '', descripcion: '', lugar_id: g.lugares[0].id, coach_id: (g.coaches[0] || {}).id, cupo: '', horas_cancelacion: '', dias_apertura: '', activa: true, horario: [] };
       var nombre = h('input', { type: 'text', id: 'aNombre', maxlength: '60', value: a.nombre });
       var desc = h('textarea', { id: 'aDesc', maxlength: '500', rows: '3' }); desc.value = a.descripcion || '';
+      if (!a.lugar_id || !g.lugares.some(function (l) { return l.id === a.lugar_id && l.activo; })) a.lugar_id = a.lugar_id || ((g.lugares.filter(function (l) { return l.activo; })[0] || {}).id);
       var lugar = h('select', { id: 'aLugar' }, g.lugares.filter(function (l) { return l.activo || l.id === a.lugar_id; }).map(function (l) { return h('option', { value: l.id, selected: l.id === a.lugar_id, texto: l.nombre }); }));
       var coach = h('select', { id: 'aCoach' }, g.coaches.map(function (c) { return h('option', { value: c.id, selected: c.id === a.coach_id, texto: c.nombre }); }));
+      var nueva = !a.id;
       var cupo = h('input', { type: 'number', id: 'aCupo', min: '1', max: '500', inputmode: 'numeric', placeholder: 'Sin límite', value: a.cupo === '' ? '' : String(a.cupo) });
       var horas = h('input', { type: 'number', id: 'aHoras', min: '0', max: '168', inputmode: 'numeric', placeholder: 'General: ' + g.general.horas_cancelacion, value: a.horas_cancelacion === '' ? '' : String(a.horas_cancelacion) });
       var dias = h('input', { type: 'number', id: 'aDias', min: '0', max: '60', inputmode: 'numeric', placeholder: 'General: ' + g.general.dias_apertura, value: a.dias_apertura === '' ? '' : String(a.dias_apertura) });
@@ -430,9 +467,30 @@
       var mostrar = h('input', { type: 'checkbox', id: 'aMostrar' }); mostrar.checked = a.mostrar_antes !== false;
       // Color e icono: «Automático» = el servidor elige (icono por el nombre, color fijo por actividad).
       var FA = window.FitclubActividad;
-      var eleccion = { color: a.color_elegido || '', icono: a.icono_elegido || '' };
+      var eleccion = { color: a.color_elegido || '', icono: a.icono_elegido || '', imagen: null }; // imagen: null = sin cambios; '' = quitar
       var muestra = h('span', {});
-      function pintarMuestra() { muestra.innerHTML = ''; muestra.appendChild(FA.miniatura(h, { color: eleccion.color || a.color || '#475569', icono: eleccion.icono || a.icono || 'fuerza' }, 46)); }
+      function pintarMuestra() {
+        muestra.innerHTML = '';
+        var m = { id: a.id, color: eleccion.color || a.color || '#475569', icono: eleccion.icono || a.icono || 'fuerza', imagen_v: eleccion.imagen === null ? a.imagen_v : '', imagen: eleccion.imagen || '' };
+        muestra.appendChild(FA.miniatura(h, m, 64));
+        if (bQuitarImg) bQuitarImg.hidden = !(eleccion.imagen || (eleccion.imagen === null && a.imagen_v));
+      }
+      // Imagen propia: se reduce en el móvil a 96×96 y pocos KB antes de enviarla.
+      var bQuitarImg = null;
+      var archivo = h('input', { type: 'file', accept: 'image/*', id: 'aImagen', 'aria-label': 'Elegir imagen de la actividad' });
+      var avisoImg = h('div', {});
+      archivo.addEventListener('change', function () {
+        avisoImg.innerHTML = '';
+        if (!archivo.files[0]) return;
+        FA.reducirImagen(archivo.files[0]).then(function (d) {
+          eleccion.imagen = d; pintarMuestra();
+          avisoImg.appendChild(h('p', { clase: 'subtitulo', style: 'margin:6px 0 0', texto: 'Imagen lista (' + Math.max(1, Math.round(d.length * 0.75 / 1024)) + ' KB). Se guarda al pulsar «Guardar actividad».' }));
+        }).catch(function (e) { avisoImg.appendChild(aviso('error', e.message)); });
+        archivo.value = '';
+      });
+      bQuitarImg = h('button', { clase: 'boton-mini secundario', type: 'button', texto: 'Quitar imagen', alClick: function () { eleccion.imagen = ''; pintarMuestra(); avisoImg.innerHTML = ''; } });
+      var zonaImagen = h('div', { clase: 'imagen-actividad' }, [archivo,
+        h('label', { clase: 'boton-mini secundario', for: 'aImagen', texto: 'Subir imagen' }), bQuitarImg]);
       function selector(clase, valores, clave, dibujo, etiqueta) {
         var caja = h('div', { clase: clase, role: 'group', 'aria-label': etiqueta });
         function marcar() { caja.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b._v === eleccion[clave] ? 'true' : 'false'); }); pintarMuestra(); }
@@ -445,7 +503,7 @@
         return caja;
       }
       var selColor = selector('selector-color', FA.colores, 'color', function (c) { return h('button', { type: 'button', style: 'background:' + c, 'aria-label': 'Color ' + c, id: 'aColor' + c.slice(1) }); }, 'Color de la actividad');
-      var NOMBRES_ICONO = { fuerza: 'Fuerza', run: 'Correr', yoga: 'Yoga', bici: 'Bici', agua: 'Agua', cardio: 'Cardio' };
+      var NOMBRES_ICONO = FA.nombresIconos;
       var selIcono = selector('selector-icono', FA.iconos, 'icono', function (n) { var b = h('button', { type: 'button', 'aria-label': 'Icono ' + NOMBRES_ICONO[n], id: 'aIcono' + n }); b.appendChild(FA.svg(n, 22)); return b; }, 'Icono de la actividad');
       var franjas = h('div', {});
       var filas = (a.horario || []).map(function (x) { return { dia_semana: x.dia_semana, hora_inicio: x.hora_inicio, hora_fin: x.hora_fin }; });
@@ -466,8 +524,10 @@
       var zona = h('div', {});
       var bGuardar = h('button', { clase: 'boton', type: 'button', texto: 'Guardar actividad', alClick: function () {
         bGuardar.disabled = true; bGuardar.textContent = 'Guardando…'; zona.innerHTML = '';
-        U.Api.llamar('actividades.guardar', { id: a.id, nombre: nombre.value, descripcion: desc.value, lugar_id: lugar.value, coach_id: coach.value,
-          cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, mostrar_antes: mostrar.checked, horario: filas, color: eleccion.color, icono: eleccion.icono })
+        var datos = { id: a.id, nombre: nombre.value, descripcion: desc.value, lugar_id: lugar.value, coach_id: coach.value,
+          cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, mostrar_antes: mostrar.checked, horario: filas, color: eleccion.color, icono: eleccion.icono };
+        if (eleccion.imagen !== null) datos.imagen = eleccion.imagen;
+        U.Api.llamar('actividades.guardar', datos)
           .then(function (d) { ui.gestion = d; ui.opciones = null; ui.editando = null; repintar(); })
           .catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = 'Guardar actividad'; zona.appendChild(aviso('error', e.mensaje)); });
       } });
@@ -475,16 +535,17 @@
         h('button', { clase: 'volver', type: 'button', texto: '‹ Actividades', alClick: function () { ui.editando = null; repintar(); } }),
         h('div', { clase: 'tarjeta' }, [
           U.campo('Nombre', nombre), U.campo('Descripción (la verán los clientes)', desc),
-          U.campo('Lugar', lugar), U.campo('Coach', coach),
+          U.campo('Lugar', lugar), esBoss ? U.campo('Coach', coach) : null,
           U.campo('Plazas por sesión', cupo, 'Vacío = sin límite. Puedes ponerlo cuando quieras.'),
-          h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Color e icono (se ven en el Inicio y en la Agenda)' }),
-          h('div', { style: 'display:flex;gap:14px;align-items:flex-start;margin-bottom:12px' }, [muestra, h('div', { style: 'display:flex;flex-direction:column;gap:10px;flex:1' }, [selColor, selIcono])]),
+          h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Color e icono, o una imagen propia (se ven en el Inicio y en la Agenda)' }),
+          h('div', { style: 'display:flex;gap:14px;align-items:flex-start;margin-bottom:12px' }, [muestra, h('div', { style: 'display:flex;flex-direction:column;gap:10px;flex:1;min-width:0' }, [selColor, selIcono, zonaImagen, avisoImg])]),
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Horario semanal' }), franjas, anadir,
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Reservas (vacío = valor general)' }),
           h('div', { clase: 'dos' }, [U.campo('Horas para cancelar', horas), U.campo('Días de apertura', dias)]),
           h('label', { clase: 'casilla', for: 'aMostrar' }, [mostrar, h('span', { texto: 'Los clientes ven las sesiones antes de que se abra la inscripción (con los días que faltan). Si lo desmarcas, aparecen al abrirse.' })]),
           h('label', { clase: 'casilla', for: 'aActiva', style: 'margin-top:8px' }, [activa, h('span', { texto: 'Actividad activa (si no, no se generan sesiones nuevas)' })]),
-          bGuardar, zona
+          bGuardar, zona,
+          nueva ? null : zonaBorrar(a)
         ]),
         h('p', { clase: 'subtitulo', style: 'margin-top:12px', texto: 'Los cambios de horario se aplican a las sesiones que generes a partir de ahora. Las ya creadas se ajustan una a una en la Semana.' })
       ];

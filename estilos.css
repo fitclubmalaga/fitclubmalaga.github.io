@@ -67,7 +67,7 @@ input.codigo { letter-spacing: 10px; font-size: 26px; text-align: center; }
 .segmento button { flex: 1; min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: var(--color-texto-suave); font-weight: 600; font-size: 14px; }
 .segmento button[aria-pressed=true] { background: var(--color-tarjeta); color: var(--color-texto); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 button.fila { width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; }
-.fila .principal { display: flex; flex-direction: column; min-width: 0; }
+.fila .principal { display: flex; flex-direction: column; min-width: 0; flex: 1; } /* ocupa el hueco: el texto siempre alineado a la izquierda */
 .fila .principal small { color: var(--color-texto-suave); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .campo { margin-bottom: 14px; }
 select { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--color-linea); background: var(--color-fondo); color: var(--color-texto); font: inherit; }
@@ -293,3 +293,16 @@ a.heroe-dato strong { font-size: 14px; color: #1D4ED8; }
 .selector-icono button { width: 44px; height: 44px; border-radius: 12px; border: 2px solid transparent; background: var(--color-control); color: var(--color-texto); display: grid; place-items: center; }
 .selector-icono button[aria-pressed=true] { border-color: var(--color-acento); color: var(--color-acento); }
 .selector-color .auto, .selector-icono .auto { width: auto; padding: 0 12px; border-radius: 17px; background: var(--color-control); color: var(--color-texto); font-size: 13px; font-weight: 600; }
+
+/* ---- 0.10.0: imagen propia de la actividad, logo en el Inicio, borrar actividad ---- */
+.mini-act { overflow: hidden; }
+.mini-act.con-imagen { background: #fff !important; }
+.mini-act.con-imagen img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.heroe-arriba { gap: 12px; }
+.heroe-logo { height: 34px; width: auto; flex: 0 1 auto; min-width: 0; object-fit: contain; }
+.heroe-hueco { width: 40px; height: 40px; }
+.imagen-actividad { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.imagen-actividad input[type=file] { display: none; }
+.zona-peligro { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--color-linea); }
+.borrar-resumen { margin: 0 0 10px; color: var(--color-texto); }
+label.boton-mini { display: inline-flex; align-items: center; cursor: pointer; }

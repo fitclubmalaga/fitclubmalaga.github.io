@@ -17,6 +17,12 @@
     bici: '<circle cx="6" cy="17" r="3.5"/><circle cx="18" cy="17" r="3.5"/><path d="M6 17l4-8h5l3 8M10 9l2 8h-3M14 5h3"/>',
     agua: '<path d="M2 18c2 0 2-1.5 4-1.5S8 18 10 18s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><circle cx="15" cy="6" r="2"/><path d="M5 14l5-5 3 2 4-2"/>',
     cardio: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
+    pesa: '<path d="M9 9V6.5a3 3 0 0 1 6 0V9"/><path d="M6.3 20.5a7 7 0 1 1 11.4 0z"/>',
+    rayo: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    estira: '<circle cx="12" cy="4" r="2"/><path d="M3 9l9 2 9-2M12 11v4l-4 6M12 15l4 6"/>',
+    boxeo: '<path d="M7 12V8a5 5 0 0 1 10 0v5a5 5 0 0 1-5 5H9.5A3.5 3.5 0 0 1 6 14.5V13a2 2 0 0 1 2-2h4"/><path d="M8 18v3h8v-3"/>',
+    monte: '<path d="M2 20l7-12 4 6 3-4 6 10z"/><path d="M7 11.5l2 1.5 2-1.5"/>',
+    pelota: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6a9 9 0 0 1 0 12.8M18.4 5.6a9 9 0 0 0 0 12.8"/>',
     cal: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     check: '<path d="M4 12l5 5L20 6"/>',
     alta: '<circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3-6 7-6s7 2 7 6M19 8v6M16 11h6"/>',
@@ -35,15 +41,90 @@
     s.innerHTML = ICONOS[nombre] || ICONOS.fuerza;
     return s;
   }
-  /** Cuadrado de color con el icono de la actividad (también para la Agenda). */
+  // Imágenes propias de las actividades: se piden aparte (una vez por versión) y se guardan en el móvil.
+  var imagenes = {}, pendientes = {}, esperando = [], temporizador = null;
+  function claveImg(id, v) { return 'fitclub_img_' + id + '_' + v; }
+  function imagenDe(id, v) {
+    var k = claveImg(id, v);
+    if (imagenes[k]) return imagenes[k];
+    try { var x = localStorage.getItem(k); if (x) { imagenes[k] = x; return x; } } catch (e) { /* sin almacenamiento */ }
+    return null;
+  }
+  function pedirImagenes() {
+    temporizador = null;
+    var api = window.FitclubActividad.api;
+    var lote = esperando.splice(0);
+    var ids = Object.keys(pendientes); pendientes = {};
+    if (!api || !ids.length) return;
+    api.llamar('actividades.imagenes', { ids: ids }).then(function (r) {
+      lote.forEach(function (p) {
+        var img = r.imagenes[p.id];
+        if (!img) return;
+        var k = claveImg(p.id, p.v); imagenes[k] = img;
+        try {
+          for (var i = localStorage.length - 1; i >= 0; i--) { var c = localStorage.key(i); if (c && c.indexOf('fitclub_img_' + p.id + '_') === 0 && c !== k) localStorage.removeItem(c); }
+          localStorage.setItem(k, img);
+        } catch (e) { /* sin espacio: queda en memoria */ }
+        ponerImagen(p.el, img);
+      });
+    }).catch(function () { /* se queda el icono */ });
+  }
+  function ponerImagen(el, img) {
+    el.innerHTML = '';
+    el.classList.add('con-imagen');
+    var i = document.createElement('img'); i.src = img; i.alt = ''; el.appendChild(i);
+  }
+  /** Cuadrado con la imagen propia de la actividad o, si no tiene, su color con el icono (también para la Agenda). */
   function miniatura(h, s, tam) {
     var t = tam || 46;
     var el = h('span', { clase: 'mini-act', 'aria-hidden': 'true', style: 'width:' + t + 'px;height:' + t + 'px;background:' + (/^#[0-9A-Fa-f]{6}$/.test(s.color || '') ? s.color : '#475569') });
+    var id = s.actividad_id || s.id, v = s.imagen_v;
+    if (s.imagen) { ponerImagen(el, s.imagen); return el; } // vista previa del editor
+    if (v && id) {
+      var img = imagenDe(id, v);
+      if (img) { ponerImagen(el, img); return el; }
+      pendientes[id] = true; esperando.push({ id: id, v: v, el: el });
+      if (!temporizador) temporizador = setTimeout(pedirImagenes, 30);
+    }
     el.appendChild(svg(s.icono, Math.round(t * 0.48), '#FFFFFF'));
     return el;
   }
-  window.FitclubActividad = { miniatura: miniatura, svg: svg, iconos: ['fuerza', 'run', 'yoga', 'bici', 'agua', 'cardio'],
-    colores: ['#C2410C', '#15803D', '#0E7490', '#7C3AED', '#BE185D', '#1D4ED8', '#B45309', '#475569'] };
+  /**
+   * Deja una imagen elegida en 96×96 (se ve nítida a 46 px en pantallas retina) con los menos KB posibles:
+   * WebP si el navegador sabe crearlo, si no JPEG; baja la calidad hasta quedar por debajo de ~6 KB.
+   */
+  function reducirImagen(archivo) {
+    return new Promise(function (ok, mal) {
+      if (!archivo || !/^image\//.test(archivo.type || 'image/')) return mal(new Error('Elige una imagen.'));
+      var url = URL.createObjectURL(archivo);
+      var im = new Image();
+      im.onload = function () {
+        URL.revokeObjectURL(url);
+        var lado = Math.min(im.naturalWidth, im.naturalHeight);
+        if (!lado) return mal(new Error('No se ha podido leer la imagen.'));
+        var c = document.createElement('canvas'); c.width = c.height = 96;
+        var x = c.getContext('2d');
+        x.fillStyle = '#fff'; x.fillRect(0, 0, 96, 96);
+        x.imageSmoothingQuality = 'high';
+        x.drawImage(im, (im.naturalWidth - lado) / 2, (im.naturalHeight - lado) / 2, lado, lado, 0, 0, 96, 96);
+        var mejor = null;
+        for (var q = 0.82; q >= 0.4; q -= 0.08) {
+          var w = c.toDataURL('image/webp', q);
+          var d = w.indexOf('data:image/webp') === 0 ? w : c.toDataURL('image/jpeg', q);
+          if (!mejor || d.length < mejor.length) mejor = d;
+          if (d.length <= 8000) return ok(d); // ≈ 6 KB
+        }
+        if (mejor && mejor.length <= 20000) return ok(mejor);
+        mal(new Error('No se ha podido reducir la imagen. Prueba con otra.'));
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); mal(new Error('No se ha podido leer la imagen. Prueba con una foto JPEG o PNG.')); };
+      im.src = url;
+    });
+  }
+  window.FitclubActividad = { miniatura: miniatura, svg: svg, reducirImagen: reducirImagen, api: null,
+    iconos: ['fuerza', 'pesa', 'rayo', 'run', 'bici', 'agua', 'yoga', 'estira', 'cardio', 'boxeo', 'monte', 'pelota'],
+    nombresIconos: { fuerza: 'Fuerza', pesa: 'Pesa rusa', rayo: 'HIIT', run: 'Correr', bici: 'Bici', agua: 'Agua', yoga: 'Yoga', estira: 'Estiramientos', cardio: 'Cardio', boxeo: 'Boxeo', monte: 'Montaña', pelota: 'Pelota' },
+    colores: ['#C2410C', '#1D4ED8', '#15803D', '#BE185D', '#7C3AED', '#0E7490', '#B45309', '#B91C1C', '#4D7C0F', '#A21CAF', '#0369A1', '#475569'] };
 
   function saludo() { var hr = new Date().getHours(); return hr >= 6 && hr < 14 ? 'Buenos días' : hr >= 14 && hr < 21 ? 'Buenas tardes' : 'Buenas noches'; }
   function cuentaAtras(min) {
@@ -61,6 +142,7 @@
 
   window.VistaInicio = function (U, usuario) {
     var h = U.h, aviso = U.aviso;
+    window.FitclubActividad.api = U.Api;
     var caja = h('div', { clase: 'inicio' });
 
     function cargar() {
@@ -72,7 +154,9 @@
     function heroe(hijos) { return h('section', { clase: 'heroe', 'aria-label': 'Resumen' }, hijos); }
     function cabeceraHeroe(botonDerecha) {
       var c = U.circulo(usuario, { clase: 'heroe-avatar' });
-      return h('div', { clase: 'heroe-arriba' }, [c, botonDerecha || null]);
+      // Logo del club en blanco (la variante de los iconos de la app), centrado sobre la tarjeta oscura.
+      var logo = h('img', { clase: 'heroe-logo', src: 'iconos/logo-fitclub-blanco-app.png', alt: 'Fitclub Málaga', width: '720', height: '296' });
+      return h('div', { clase: 'heroe-arriba' }, [c, logo, botonDerecha || h('span', { clase: 'heroe-hueco' })]);
     }
     function campana(n, alPulsar) {
       var b = h('button', { type: 'button', clase: 'heroe-boton', 'aria-label': n ? 'Avisos: ' + n + ' pendientes' : 'Sin avisos', alClick: alPulsar });
@@ -259,7 +343,7 @@
       var hh = d.hero, p = hh.proxima;
       var reservas = hh.reservas_semana;
       caja.appendChild(heroe([
-        cabeceraHeroe(h('span', { clase: 'heroe-club', texto: 'Fitclub Málaga' })),
+        cabeceraHeroe(null),
         h('h1', { clase: 'heroe-saludo', texto: 'Hola, ' + usuario.nombre }),
         cifra('Tu próxima sesión', p ? cuentaAtras(p.minutos) : null, p ? p.hora_inicio : null,
           p ? p.actividad + ' · ' + diaRelativo(p.fecha, d.hoy, p.dia) : 'Aún no tienes reservas: elige abajo una sesión.', null),
