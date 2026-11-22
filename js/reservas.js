@@ -37,15 +37,15 @@
       } });
       return h('div', { clase: 'tarjeta reserva' }, [
         h('div', { clase: 'reserva-fecha' }, [h('strong', { texto: String(+r.fecha.slice(8)) }), h('small', { texto: MESES[+r.fecha.slice(5, 7) - 1] })]),
-        h('div', { clase: 'principal', style: 'flex:1' }, [
+        h('div', { clase: 'principal', style: 'flex:1;min-width:0' }, [
           h('span', { clase: 'reserva-titulo', texto: r.actividad }),
           h('small', { texto: r.dia + ' · ' + r.hora_inicio + '-' + r.hora_fin }),
-          h('small', { clase: 'con-coach' }, [r.lugar + (r.coach ? ' · ' : ''), r.coach ? U.circulo({ nombre: r.coach, apellidos: '', foto: r.coach_foto }, { clase: 'micro', ampliable: true }) : null, r.coach ? ' ' + r.coach : '']),
-          conAcciones ? h('div', { clase: 'acciones-reserva' }, [
-            h('span', { clase: 'etiqueta ok', texto: 'Reservada ✓' }), cancelar,
-            r.mapa ? h('a', { clase: 'mapa', href: r.mapa, target: '_blank', rel: 'noopener noreferrer', texto: 'Cómo llegar' }) : null
-          ]) : null
-        ])
+          h('small', { clase: 'con-coach' }, [r.lugar + (r.coach ? ' · ' : ''), r.coach ? h('span', { clase: 'coach-nombre' }, [U.circulo({ nombre: r.coach, apellidos: '', foto: r.coach_foto }, { clase: 'micro', ampliable: true }), ' ' + r.coach]) : null]),
+          conAcciones ? h('span', { clase: 'etiqueta ok', style: 'margin-top:6px;display:inline-block', texto: 'Reservada ✓' }) : null
+        ]),
+        // A la derecha, como en la Agenda: «Cancelar» y debajo «Cómo llegar» (Miguel, 22-11).
+        conAcciones ? h('div', { clase: 'acciones-derecha' }, [cancelar,
+          r.mapa ? h('a', { clase: 'mapa', href: r.mapa, target: '_blank', rel: 'noopener noreferrer', texto: 'Cómo llegar' }) : null]) : null
       ]);
     }
 

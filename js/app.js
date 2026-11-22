@@ -158,12 +158,24 @@
 
 
   // ---------- bienvenida: dos caminos claros ----------
+  /** Logo del club: azul marino en modo claro y blanco (la variante de los iconos de la app) en modo oscuro. */
+  function logoClub(clase) {
+    var pic = document.createElement('picture');
+    pic.className = 'logo-club' + (clase ? ' ' + clase : '');
+    var src = document.createElement('source');
+    src.media = '(prefers-color-scheme: dark)'; src.srcset = 'iconos/logo-fitclub-blanco-app.png';
+    var img = document.createElement('img');
+    img.src = 'iconos/logo-fitclub-marino.png'; img.alt = 'Fitclub Málaga'; img.width = 720; img.height = 296;
+    pic.appendChild(src); pic.appendChild(img);
+    return pic;
+  }
+
   function pantallaBienvenida() {
     var opcion = function (titulo, texto, clase, fn) {
       return h('button', { clase: 'opcion ' + clase, type: 'button', alClick: fn }, [h('strong', { texto: titulo }), h('span', { texto: texto })]);
     };
     pintar([
-      h('div', { clase: 'marca' }, [h('div', { clase: 'logo', 'aria-hidden': 'true', texto: 'F' }), h('h1', { texto: 'Fitclub Málaga' }), h('p', { texto: 'Entrenamientos al aire libre' })]),
+      h('div', { clase: 'marca' }, [logoClub(), h('h1', { clase: 'solo-lector', texto: 'Fitclub Málaga' }), h('p', { texto: 'Entrenamientos al aire libre' })]),
       opcion('Ya soy socio', 'Entra con tu email: te enviaremos un código.', 'principal', function () { pantallaAcceso(); }),
       opcion('Es mi primera vez', 'Date de alta en 3 pasos: tus datos, confirmar tu email y la aprobación del club.', '', function () { pantallaAlta(); })
     ], false);
@@ -360,6 +372,30 @@
         botonAccion('Aprobar', '', function () { return Api.llamar('usuarios.aprobar', { id: u.id, rol: selectorRol.value }); }),
         botonAccion('Rechazar', 'peligro', function () { return confirm('¿Rechazar el alta de ' + u.nombre + '?') && Api.llamar('usuarios.rechazar', { id: u.id }); })
       ]));
+    }
+    // Corregir nombre y apellidos (el Boss, de cualquiera, también los suyos).
+    var inNombre = h('input', { type: 'text', id: 'editNombre', maxlength: '60', autocomplete: 'off', value: u.nombre || '' });
+    var inApellidos = h('input', { type: 'text', id: 'editApellidos', maxlength: '60', autocomplete: 'off', value: u.apellidos || '' });
+    nodos.push(h('p', { clase: 'seccion', texto: 'Nombre' }), h('div', { clase: 'tarjeta' }, [
+      h('div', { clase: 'dos' }, [campo('Nombre', inNombre), campo('Apellidos', inApellidos)]),
+      botonAccion('Guardar nombre', 'secundario', function () {
+        if (inNombre.value.trim() === (u.nombre || '') && inApellidos.value.trim() === (u.apellidos || '')) return null;
+        return Api.llamar('usuarios.editarNombre', { id: u.id, nombre: inNombre.value, apellidos: inApellidos.value }).then(function (d) {
+          var yo = estado.inicio && estado.inicio.usuario;
+          if (yo && yo.id === u.id) {
+            var n = d.usuarios.filter(function (x) { return x.id === u.id; })[0];
+            if (n) {
+              yo.nombre = n.nombre; yo.apellidos = n.apellidos;
+              Api.guardarInicio && Api.guardarInicio(estado.inicio);
+              document.querySelectorAll('.cabecera .avatar').forEach(function (el) { pintarCirculo(el, yo, yo.foto ? fotoDe(yo.foto) : ''); });
+            }
+          }
+          return d;
+        });
+      })
+    ]));
+    if (u.estado === 'PENDIENTE') {
+      // (los botones de aprobar o rechazar ya están arriba)
     } else if (u.estado === 'ACTIVO') {
       nodos.push(h('p', { clase: 'seccion', texto: 'Rol' }), selectorRol);
       nodos.push(botonAccion('Guardar rol', 'secundario', function () { return Api.llamar('usuarios.cambiarRol', { id: u.id, rol: selectorRol.value }); }));
@@ -420,7 +456,10 @@
     var u = inicio.usuario;
     var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), circulo(u)]);
     var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios()
-      : (actual.id === 'agenda' || (actual.id === 'sesiones' && u.rol === 'COACH')) && window.VistaAgenda ? window.VistaAgenda(UI, u)
+      : actual.id === 'sesiones' && u.rol === 'COACH' && window.VistaCoachSesiones ? window.VistaCoachSesiones(UI, u)
+      : actual.id === 'participantes' && u.rol === 'COACH' && window.VistaParticipantes ? window.VistaParticipantes(UI, u)
+      : actual.id === 'resumen' && u.rol === 'BOSS' && window.VistaResumen ? window.VistaResumen(UI, u)
+      : actual.id === 'agenda' && window.VistaAgenda ? window.VistaAgenda(UI, u)
       : actual.id === 'reservas' && u.rol === 'USUARIO' && window.VistaReservas ? window.VistaReservas(UI, u) : vistaProximamente(actual);
     pintar([cabecera].concat(vista), true);
   }
@@ -496,7 +535,8 @@
         h('div', { clase: 'fila' }, [h('span', { texto: 'Rol' }), h('span', { clase: 'etiqueta', texto: NOMBRES_ROL[u.rol] || u.rol })])
       ]),
       botonSalir(),
-      h('p', { clase: 'subtitulo', style: 'text-align:center;margin-top:24px', texto: (inicio.club && inicio.club.nombre || 'Fitclub') + ' · versión ' + (inicio.version || '') })
+      h('div', { style: 'margin-top:28px' }, [logoClub('pequeno')]),
+      h('p', { clase: 'subtitulo', style: 'text-align:center;margin-top:8px', texto: 'Versión ' + (inicio.version || '') })
     ];
   }
 
@@ -511,7 +551,7 @@
   function botonSalir() {
     return h('button', { clase: 'boton secundario', type: 'button', texto: 'Cerrar sesión en este móvil', alClick: function (ev) {
       ev.target.disabled = true;
-      var fin = function () { Api.olvidarSesion(); estado.pestana = null; if (window.VistaAgenda) window.VistaAgenda.reiniciar(); if (window.VistaReservas) window.VistaReservas.reiniciar(); pantallaBienvenida(); };
+      var fin = function () { Api.olvidarSesion(); estado.pestana = null; if (window.VistaAgenda) window.VistaAgenda.reiniciar(); if (window.VistaReservas) window.VistaReservas.reiniciar(); if (window.FitclubEquipo) window.FitclubEquipo.reiniciar(); pantallaBienvenida(); };
       Api.llamar('acceso.cerrarSesion').then(fin, fin);
     } });
   }

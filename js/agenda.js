@@ -56,7 +56,7 @@
   window.FitclubReservas = { nuevaClave: nuevaClave };
 
   function textoPlazas(s) {
-    if (s.cupo === '' || s.cupo === null) return { texto: 'Sin límite de plazas', clase: '' };
+    if (s.cupo === '' || s.cupo === null) return { texto: '', clase: '' }; // sin límite: no se dice nada (Miguel, 22-11)
     if (s.libres === 0) return { texto: 'Completa', clase: 'completa' };
     return { texto: 'Quedan ' + s.libres + ' de ' + s.cupo, clase: '' };
   }
@@ -153,15 +153,19 @@
         h('div', { clase: 'barra' + (cancelada ? ' apagada' : '') }),
         h('div', { clase: 'principal', style: 'flex:1' }, [
           h('span', { style: cancelada ? 'text-decoration:line-through' : '', texto: s.actividad }),
-          h('small', { clase: 'con-coach' }, [s.lugar + (s.coach ? ' · ' : ''), s.coach ? U.circulo({ nombre: s.coach, apellidos: '', foto: s.coach_foto }, { clase: 'micro', ampliable: !esBoss }) : null, s.coach ? ' ' + s.coach : '']),
-          h('small', { clase: pl.clase, texto: cancelada ? 'Cancelada' : pl.texto + (s.ocupadas && s.cupo === '' ? ' · ' + plural(s.ocupadas, 'apuntado', 'apuntados') : '') })
+          h('small', { clase: 'con-coach' }, [s.lugar + (s.coach ? ' · ' : ''), s.coach ? h('span', { clase: 'coach-nombre' }, [U.circulo({ nombre: s.coach, apellidos: '', foto: s.coach_foto }, { clase: 'micro', ampliable: !esBoss }), ' ' + s.coach]) : null]),
+          (function () {
+            var t = cancelada ? 'Cancelada' : [pl.texto, s.cupo === '' && s.ocupadas && !esCliente ? plural(s.ocupadas, 'apuntado', 'apuntados') : ''].filter(Boolean).join(' · ');
+            return t ? h('small', { clase: pl.clase, texto: t }) : null;
+          })()
         ])
       ];
       if (!esBoss) {
         if (esCliente && s.mi && !cancelada) {
+          // Botones a la derecha: Reservar (o Reservada + Cancelar) y debajo «Cómo llegar» (Miguel, 22-11).
           var acc = accionesReserva(s);
           if (s.mapa) acc.appendChild(h('a', { clase: 'mapa', href: s.mapa, target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Cómo llegar a ' + s.lugar, texto: 'Cómo llegar' }));
-          contenido[2].appendChild(acc);
+          contenido.push(acc);
         } else if (s.mapa && !cancelada) contenido.push(h('a', { clase: 'mapa', href: s.mapa, target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Cómo llegar a ' + s.lugar, texto: 'Cómo llegar' }));
         return h('div', { clase: 'fila sesion' + (s.mi && s.mi.reserva ? ' reservada' : '') }, contenido);
       }
@@ -171,7 +175,7 @@
     // ------------------------------------------------ reservas del cliente (hito 1.4)
     function accionesReserva(s) {
       var mi = s.mi;
-      var caja2 = h('div', { clase: 'acciones-reserva' });
+      var caja2 = h('div', { clase: 'acciones-derecha' });
       if (mi.reserva) {
         caja2.appendChild(h('span', { clase: 'etiqueta ok', texto: 'Reservada ✓' }));
         if (!mi.empezada) caja2.appendChild(h('button', { clase: 'boton-mini secundario', type: 'button', texto: 'Cancelar', 'aria-label': 'Cancelar mi plaza en ' + s.actividad + ' ' + s.dia + ' ' + s.hora_inicio, alClick: function (ev) {
@@ -184,7 +188,11 @@
         return caja2;
       }
       if (mi.empezada) return caja2;
-      if (mi.abre) { caja2.appendChild(h('small', { texto: 'Reservas desde el ' + diaMes(mi.abre) })); return caja2; }
+      if (mi.abre) {
+        var n = mi.dias_para_abrir;
+        caja2.appendChild(h('small', { clase: 'abre-en', title: 'Inscripción desde el ' + diaMes(mi.abre), texto: n === 1 ? 'Inscripción mañana' : 'Inscripción en ' + n + ' días' }));
+        return caja2;
+      }
       if (s.libres === 0) return caja2;
       caja2.appendChild(h('button', { clase: 'boton-mini', type: 'button', texto: 'Reservar', 'aria-label': 'Reservar ' + s.actividad + ' ' + s.dia + ' ' + s.hora_inicio, alClick: function (ev) {
         var b = ev.currentTarget; b.disabled = true; b.textContent = 'Reservando…';
@@ -308,6 +316,14 @@
           U.campo('Plazas', cupo, 'Vacío = sin límite. Ahora hay ' + (s.ocupadas || 0) + ' apuntados.'),
           bGuardar, zona
         ]),
+        h('button', { clase: 'boton secundario', type: 'button', id: 'verLista', style: 'margin-top:8px', texto: 'Participantes y lista (' + (s.ocupadas || 0) + ')', alClick: function () {
+          ui.editando = function () {
+            var c = h('div', {});
+            window.FitclubEquipo.pintarLista(U, c, s.id, function () { ui.editando = null; repintar(); });
+            return [c];
+          };
+          repintar();
+        } }),
         bEstado, bBorrar
       ];
     }
@@ -409,6 +425,7 @@
       var horas = h('input', { type: 'number', id: 'aHoras', min: '0', max: '168', inputmode: 'numeric', placeholder: 'General: ' + g.general.horas_cancelacion, value: a.horas_cancelacion === '' ? '' : String(a.horas_cancelacion) });
       var dias = h('input', { type: 'number', id: 'aDias', min: '0', max: '60', inputmode: 'numeric', placeholder: 'General: ' + g.general.dias_apertura, value: a.dias_apertura === '' ? '' : String(a.dias_apertura) });
       var activa = h('input', { type: 'checkbox', id: 'aActiva' }); activa.checked = a.activa !== false;
+      var mostrar = h('input', { type: 'checkbox', id: 'aMostrar' }); mostrar.checked = a.mostrar_antes !== false;
       var franjas = h('div', {});
       var filas = (a.horario || []).map(function (x) { return { dia_semana: x.dia_semana, hora_inicio: x.hora_inicio, hora_fin: x.hora_fin }; });
       function pintarFranjas() {
@@ -429,7 +446,7 @@
       var bGuardar = h('button', { clase: 'boton', type: 'button', texto: 'Guardar actividad', alClick: function () {
         bGuardar.disabled = true; bGuardar.textContent = 'Guardando…'; zona.innerHTML = '';
         U.Api.llamar('actividades.guardar', { id: a.id, nombre: nombre.value, descripcion: desc.value, lugar_id: lugar.value, coach_id: coach.value,
-          cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, horario: filas })
+          cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, mostrar_antes: mostrar.checked, horario: filas })
           .then(function (d) { ui.gestion = d; ui.opciones = null; ui.editando = null; repintar(); })
           .catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = 'Guardar actividad'; zona.appendChild(aviso('error', e.mensaje)); });
       } });
@@ -442,6 +459,7 @@
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Horario semanal' }), franjas, anadir,
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Reservas (vacío = valor general)' }),
           h('div', { clase: 'dos' }, [U.campo('Horas para cancelar', horas), U.campo('Días de apertura', dias)]),
+          h('label', { clase: 'casilla', for: 'aMostrar' }, [mostrar, h('span', { texto: 'Los clientes ven las sesiones antes de que se abra la inscripción (con los días que faltan). Si lo desmarcas, aparecen al abrirse.' })]),
           h('label', { clase: 'casilla', for: 'aActiva', style: 'margin-top:8px' }, [activa, h('span', { texto: 'Actividad activa (si no, no se generan sesiones nuevas)' })]),
           bGuardar, zona
         ]),

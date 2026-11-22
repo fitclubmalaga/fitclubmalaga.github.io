@@ -41,9 +41,13 @@ input.codigo { letter-spacing: 10px; font-size: 26px; text-align: center; }
 .vacio p { margin: 0; }
 
 .marca { text-align: center; margin: 32px 0 20px; }
+.logo-club { display: block; margin: 0 auto; }
+.logo-club img { display: block; width: min(72vw, 300px); height: auto; margin: 0 auto; }
+.logo-club.pequeno img { width: 120px; opacity: .9; }
+.solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .marca .logo { width: 72px; height: 72px; border-radius: 18px; display: inline-grid; place-items: center; background: var(--color-acento); color: var(--color-acento-texto); font-size: 40px; font-weight: 800; }
 .marca h1 { margin: 12px 0 4px; font-size: 28px; }
-.marca p { margin: 0; color: var(--color-texto-suave); }
+.marca p { margin: 14px 0 0; color: var(--color-texto-suave); }
 
 .pestanas { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; background: var(--color-tarjeta); border-top: 1px solid var(--color-linea); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .pestanas .interior { display: flex; width: 100%; max-width: 560px; }
@@ -174,3 +178,30 @@ small.con-coach { display: flex; align-items: center; gap: 0; }
 .reserva-titulo { font-size: 17px; font-weight: 600; }
 .tarjeta.reserva .principal small { display: block; color: var(--color-texto-suave); font-size: 13px; margin-top: 2px; }
 .tarjeta.reserva small.con-coach { display: flex; }
+/* Botones de reserva a la derecha de la sesión (22-11) */
+.acciones-derecha { flex: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; margin-left: 8px; align-self: center; text-align: right; }
+.acciones-derecha .etiqueta { white-space: nowrap; }
+.acciones-derecha a.mapa { min-height: 32px; font-size: 13px; }
+.acciones-derecha .abre-en { color: var(--color-texto-suave); font-size: 12px; font-weight: 600; max-width: 96px; line-height: 1.25; }
+.fila.sesion .principal { min-width: 0; }
+.fila.sesion small.con-coach { flex-wrap: wrap; row-gap: 2px; }
+.coach-nombre { display: inline-flex; align-items: center; white-space: nowrap; }
+/* Hito 1.5 · lista, participantes y resumen */
+.cabecera-lista h2 { margin: 0 0 4px; font-size: 22px; }
+.cabecera-lista .subtitulo { margin: 0 0 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 4px 10px; border-radius: 12px; background: var(--color-control); font-size: 13px; font-weight: 600; }
+.chip.ok { background: rgba(22,163,74,.14); color: #15803D; }
+.chip.mal { background: rgba(220,38,38,.12); color: #B91C1C; }
+.fila.participante { gap: 10px; }
+.marcas { display: flex; gap: 6px; flex: none; }
+.marca-lista { min-height: 40px; padding: 0 12px; border-radius: 20px; border: 1px solid var(--color-linea); background: var(--color-tarjeta); color: var(--color-texto); font-size: 14px; font-weight: 600; font-family: inherit; }
+.marca-lista.si[aria-pressed=true] { background: #16A34A; border-color: #16A34A; color: #fff; }
+.marca-lista.no[aria-pressed=true] { background: #DC2626; border-color: #DC2626; color: #fff; }
+.marca-lista:disabled { opacity: .45; }
+.datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.dato { background: var(--color-tarjeta); border-radius: 14px; padding: 12px 14px; }
+.dato strong { display: block; font-size: 26px; line-height: 1.15; }
+.dato small { color: var(--color-texto-suave); font-size: 13px; }
+.dato.alerta strong { color: var(--color-acento); }
+@media (min-width: 600px) { .datos { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
