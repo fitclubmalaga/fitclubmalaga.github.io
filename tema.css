@@ -32,8 +32,13 @@
   --sombra-barra: 0 10px 30px rgba(15, 30, 49, .18), 0 2px 6px rgba(15, 30, 49, .08);
   --fuente: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
 }
+/* Modo oscuro: automático (según el móvil) salvo que la persona elija «Claro» u «Oscuro» en su Perfil
+   (atributo data-tema en <html>, que se pone antes de pintar desde index.html). */
+:root { color-scheme: light dark; }
+:root[data-tema="claro"] { color-scheme: light; }
+:root[data-tema="oscuro"] { color-scheme: dark; }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     --color-fondo: #000000;
     --color-tarjeta: #1C1C1E;
     --color-texto: #F2F2F7;
@@ -52,4 +57,23 @@
     --color-aviso-suave: #3A2C10;
     --sombra-barra: 0 10px 30px rgba(0, 0, 0, .6);
   }
+}
+:root[data-tema="oscuro"] {
+  --color-fondo: #000000;
+  --color-tarjeta: #1C1C1E;
+  --color-texto: #F2F2F7;
+  --color-texto-suave: #A1A1A6;
+  --color-acento: #FB923C;
+  --color-acento-texto: #111111;
+  --color-acento-suave: #3A2414;
+  --color-ok: #4ADE80;
+  --color-ok-suave: #12301D;
+  --color-error: #F87171;
+  --color-error-suave: #3A1414;
+  --color-linea: #2C2C2E;
+  --color-control: #2C2C2E;
+  --color-heroe: #16263B;
+  --color-aviso: #FBBF24;
+  --color-aviso-suave: #3A2C10;
+  --sombra-barra: 0 10px 30px rgba(0, 0, 0, .6);
 }

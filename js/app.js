@@ -162,12 +162,36 @@
   function logoClub(clase) {
     var pic = document.createElement('picture');
     pic.className = 'logo-club' + (clase ? ' ' + clase : '');
-    var src = document.createElement('source');
-    src.media = '(prefers-color-scheme: dark)'; src.srcset = 'iconos/logo-fitclub-blanco-app.png';
+    var tema = temaElegido();
     var img = document.createElement('img');
-    img.src = 'iconos/logo-fitclub-marino.png'; img.alt = 'Fitclub Málaga'; img.width = 720; img.height = 296;
-    pic.appendChild(src); pic.appendChild(img);
+    img.alt = 'Fitclub Málaga'; img.width = 720; img.height = 296;
+    if (tema === 'auto') { // sigue al móvil
+      var src = document.createElement('source');
+      src.media = '(prefers-color-scheme: dark)'; src.srcset = 'iconos/logo-fitclub-blanco-app.png';
+      pic.appendChild(src);
+    }
+    img.src = tema === 'oscuro' ? 'iconos/logo-fitclub-blanco-app.png' : 'iconos/logo-fitclub-marino.png';
+    pic.appendChild(img);
     return pic;
+  }
+
+  // ---------- apariencia: automática (según el móvil), clara u oscura; se guarda en este móvil ----------
+  function temaElegido() {
+    var t = document.documentElement.getAttribute('data-tema');
+    return t === 'claro' || t === 'oscuro' ? t : 'auto';
+  }
+  function ponerTema(t) {
+    if (t === 'claro' || t === 'oscuro') document.documentElement.setAttribute('data-tema', t);
+    else document.documentElement.removeAttribute('data-tema');
+    try { if (t === 'auto') localStorage.removeItem('fitclub_tema'); else localStorage.setItem('fitclub_tema', t); } catch (e) { /* sin almacenamiento: dura hasta cerrar */ }
+  }
+  function selectorTema(alCambiar) {
+    var caja = h('div', { clase: 'segmento', role: 'group', 'aria-label': 'Apariencia', id: 'selectorTema' });
+    [['auto', 'Automática'], ['claro', 'Clara'], ['oscuro', 'Oscura']].forEach(function (x) {
+      caja.appendChild(h('button', { type: 'button', 'aria-pressed': temaElegido() === x[0] ? 'true' : 'false', 'data-tema': x[0], texto: x[1],
+        alClick: function () { ponerTema(x[0]); if (alCambiar) alCambiar(); } }));
+    });
+    return caja;
   }
 
   function pantallaBienvenida() {
@@ -536,6 +560,9 @@
         h('div', { clase: 'fila' }, [h('span', { texto: 'Email' }), h('span', { clase: 'valor', texto: u.email })]),
         h('div', { clase: 'fila' }, [h('span', { texto: 'Rol' }), h('span', { clase: 'etiqueta', texto: NOMBRES_ROL[u.rol] || u.rol })])
       ]),
+      h('p', { clase: 'seccion', texto: 'Apariencia' }),
+      selectorTema(function () { mostrarInicio(estado.inicio); }),
+      h('p', { clase: 'subtitulo', style: 'margin:6px 4px 0', texto: 'Automática sigue el modo claro u oscuro de tu móvil. La elección se guarda en este móvil.' }),
       h('p', { clase: 'seccion', texto: 'Comparte la app' }),
       h('button', { clase: 'boton secundario', type: 'button', id: 'abrirQR', style: 'margin-top:0', texto: u.rol === 'USUARIO' ? 'Código QR para instalarla' : 'Enseñar el QR y cómo instalarla',
         alClick: function () { window.FitclubCompartir.abrir(h); } }),
