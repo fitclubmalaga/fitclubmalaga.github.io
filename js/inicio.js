@@ -187,32 +187,50 @@
     function irSemana() { var el = caja.querySelector('#inicioSemana'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     function enlaceSemana() { return h('button', { type: 'button', clase: 'enlace-texto', texto: 'Ver semana', alClick: irSemana }); }
 
-    // Tira de 7 días y lista del día elegido.
+    // Tira de 7 días y, debajo, un carrusel con un panel por día: se desliza con el dedo o se toca el día arriba.
+    // El desplazamiento lo hace el navegador (scroll-snap), así que no pesa nada.
     function semana(dias, tituloTxt, sub, filaDia, marcarDia) {
       if (estado.dia >= dias.length) estado.dia = 0;
-      var lista = h('div', { clase: 'tarjeta lista-dia' });
       var tira = h('div', { clase: 'tira-dias', role: 'group', 'aria-label': 'Elegir día' });
-      function pintarDia() {
-        tira.querySelectorAll('button').forEach(function (b, i) { b.setAttribute('aria-pressed', i === estado.dia ? 'true' : 'false'); });
-        lista.innerHTML = '';
-        var d = dias[estado.dia];
-        if (!d.sesiones.length) { lista.appendChild(h('p', { clase: 'vacio-dia', texto: 'Ese día no hay sesiones.' })); return; }
-        d.sesiones.forEach(function (s) { lista.appendChild(filaDia(s, d)); });
+      var carrusel = h('div', { clase: 'carrusel-dias', 'aria-label': tituloTxt + ': desliza para cambiar de día' });
+      function marcar(i) {
+        estado.dia = i;
+        tira.querySelectorAll('button').forEach(function (b, k) { b.setAttribute('aria-pressed', k === i ? 'true' : 'false'); });
+        carrusel.querySelectorAll('.lista-dia').forEach(function (p, k) { if (k === i) p.removeAttribute('inert'); else p.setAttribute('inert', ''); });
+      }
+      function irA(i, suave) {
+        marcar(i);
+        carrusel.scrollTo({ left: i * carrusel.clientWidth, behavior: suave ? 'smooth' : 'auto' });
       }
       dias.forEach(function (d, i) {
         var marca = marcarDia ? marcarDia(d) : null;
         tira.appendChild(h('button', { type: 'button', 'aria-pressed': i === estado.dia ? 'true' : 'false',
           'aria-label': (i === 0 ? 'Hoy, ' : '') + 'día ' + d.num + ': ' + plural(d.sesiones.length, 'sesión', 'sesiones') + (marca ? ', con reserva' : ''),
-          alClick: function () { estado.dia = i; pintarDia(); } }, [
+          alClick: function () { irA(i, true); } }, [
           h('span', { clase: 'letra', texto: d.letra }), h('span', { clase: 'num', texto: String(d.num) }),
           marcarDia ? h('span', { clase: 'punto' + (marca ? ' si' : '') }) : h('span', { clase: 'cuenta', texto: d.sesiones.length ? d.sesiones.length + ' ses.' : '—' })
         ]));
+        var panel = h('div', { clase: 'tarjeta lista-dia' });
+        if (!d.sesiones.length) panel.appendChild(h('p', { clase: 'vacio-dia', texto: 'Ese día no hay sesiones.' }));
+        d.sesiones.forEach(function (s) { panel.appendChild(filaDia(s, d)); });
+        carrusel.appendChild(panel);
       });
-      pintarDia();
-      return h('section', { id: 'inicioSemana', clase: 'inicio-seccion', 'aria-label': tituloTxt }, [titulo(tituloTxt, null, sub ? h('span', { clase: 'inicio-sub', texto: sub }) : null), tira, lista]);
+      var pendiente = false;
+      carrusel.addEventListener('scroll', function () {
+        if (pendiente) return; pendiente = true;
+        requestAnimationFrame(function () {
+          pendiente = false;
+          var i = Math.round(carrusel.scrollLeft / Math.max(1, carrusel.clientWidth));
+          if (i !== estado.dia && i >= 0 && i < dias.length) marcar(i);
+        });
+      }, { passive: true });
+      marcar(estado.dia);
+      setTimeout(function () { irA(estado.dia, false); }, 0); // cuando ya está en pantalla
+      return h('section', { id: 'inicioSemana', clase: 'inicio-seccion', 'aria-label': tituloTxt }, [titulo(tituloTxt, null, sub ? h('span', { clase: 'inicio-sub', texto: sub }) : null), tira, carrusel]);
     }
+    // Boss y coach: al tocar una sesión, su lista (como desde la Semana).
     function filaDiaSimple(s) {
-      return h('div', { clase: 'fila-dia' }, [
+      return h('button', { type: 'button', clase: 'fila-dia', 'aria-label': s.actividad + ' a las ' + s.hora_inicio + ', ' + textoPlazas(s) + '. Abrir la lista', alClick: function () { abrirLista(s.id); } }, [
         h('span', { clase: 'hora', texto: s.hora_inicio }),
         miniatura(h, s, 32),
         h('span', { clase: 'que' }, [h('span', { texto: s.actividad }), h('small', { texto: s.lugar + (s.coach ? ' · ' + s.coach : '') })]),
@@ -281,9 +299,9 @@
         var tarjeta = h('div', { clase: 'tarjeta sesion-hoy' + (s.estado === 'ahora' ? ' destacada' : '') });
         var cuerpo = h('div', { clase: 'sesion-hoy-detalle' });
         var conLista = !esBoss && (s.estado === 'ahora' || s.estado === 'pendiente');
-        var fila = h(conLista ? 'div' : 'button', { clase: 'sesion-hoy-fila', type: conLista ? null : 'button', 'aria-expanded': conLista ? null : (abierta ? 'true' : 'false'),
-          'aria-label': conLista ? null : s.actividad + ' a las ' + s.hora_inicio + ', ' + textoPlazas(s) + '. Ver quién va',
-          alClick: conLista ? null : function () { estado.abierta = abierta ? null : s.id; pintar(); } }, [
+        var fila = h(conLista ? 'div' : 'button', { clase: 'sesion-hoy-fila', type: conLista ? null : 'button',
+          'aria-label': conLista ? null : s.actividad + ' a las ' + s.hora_inicio + ', ' + textoPlazas(s) + '. Abrir la lista',
+          alClick: conLista ? null : function () { abrirLista(s.id); } }, [
           circuloEstado(s.estado), miniatura(h, s),
           h('span', { clase: 'que' }, [h('span', { clase: 'nombre', texto: s.actividad }), h('small', { texto: s.hora_inicio + '–' + s.hora_fin + ' · ' + s.lugar + (conLista ? ' · ' + textoPlazas(s) : '') })]),
           conLista ? h('button', { type: 'button', clase: 'boton-mini', 'aria-expanded': abierta ? 'true' : 'false', texto: abierta ? 'Cerrar' : 'Pasar lista', alClick: function () { estado.abierta = abierta ? null : s.id; pintar(); } }) : pild
@@ -293,14 +311,6 @@
           tarjeta.appendChild(cuerpo);
           if (conLista) {
             window.FitclubEquipo.pintarLista(U, cuerpo, s.id, null, { compacta: true, alGuardar: function () { U.Api.llamar('inicio.datos').then(function (n) { estado.datos = n; }); } });
-          } else {
-            cuerpo.appendChild(h('div', { clase: 'detalle-fila' }, [h('span', {}, ['Coach: ', h('strong', { texto: s.coach || '—' })]),
-              h('span', { texto: s.lista_marcadas ? 'Lista ✓ · ' + plural(s.lista_vinieron, 'vino', 'vinieron') : s.estado === 'pendiente' ? 'Lista sin pasar' : s.estado === 'ahora' ? 'Ahora' : 'Más tarde' })]));
-            var caras = h('div', { clase: 'caras' });
-            s.caras.forEach(function (c) { caras.appendChild(U.circulo(c, { clase: 'cara' })); });
-            caras.appendChild(h('span', { clase: 'caras-texto', texto: s.apuntados > s.caras.length ? '+' + (s.apuntados - s.caras.length) + ' · ' + textoPlazas(s) : s.apuntados ? textoPlazas(s) : 'Aún no hay nadie apuntado' }));
-            cuerpo.appendChild(caras);
-            cuerpo.appendChild(h('button', { type: 'button', clase: 'enlace-texto', texto: 'Abrir la lista', alClick: function () { abrirLista(s.id); } }));
           }
         }
         nodos.push(tarjeta);

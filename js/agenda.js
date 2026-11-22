@@ -413,7 +413,7 @@
       nodos.push(h('div', { clase: 'grupo', style: 'margin-top:12px' }, g.actividades.map(function (a) {
         var franjas = a.horario.map(function (x) { return DIAS_CORTOS[x.dia_semana] + ' ' + x.hora_inicio; }).join(', ') || 'Sin horario';
         return h('button', { clase: 'fila', type: 'button', alClick: function () { ui.editando = function () { return editorActividad(a); }; repintar(); } }, [
-          window.FitclubActividad.miniatura(h, a, 40),
+          window.FitclubActividad.miniatura(h, a, 54), // alto de las tres líneas de texto
           h('div', { clase: 'principal' }, [h('span', { texto: a.nombre }), h('small', { texto: franjas }),
             h('small', { texto: (lugares[a.lugar_id] || '') + (a.cupo === '' ? '' : ' · ' + a.cupo + ' plazas') + (esBoss && a.creado_por && a.creado_por !== 'ti' ? ' · creada por ' + a.creado_por : '') })]),
           a.activa ? U.icono('chev', 18) : h('span', { clase: 'etiqueta', texto: 'Inactiva' })

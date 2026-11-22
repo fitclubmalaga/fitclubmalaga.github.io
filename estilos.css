@@ -306,3 +306,23 @@ a.heroe-dato strong { font-size: 14px; color: #1D4ED8; }
 .zona-peligro { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--color-linea); }
 .borrar-resumen { margin: 0 0 10px; color: var(--color-texto); }
 label.boton-mini { display: inline-flex; align-items: center; cursor: pointer; }
+
+/* ---- 0.10.1: carrusel de 7 días, filas que abren la lista, QR para instalar ---- */
+.carrusel-dias { display: flex; align-items: flex-start; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.carrusel-dias::-webkit-scrollbar { display: none; }
+.carrusel-dias > .lista-dia { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+button.fila-dia { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--color-linea); text-align: left; color: inherit; font: inherit; }
+button.fila-dia:last-child { border-bottom: 0; }
+button.fila-dia::after { content: '›'; color: var(--color-texto-suave); font-size: 20px; margin-left: 2px; }
+.capa-compartir { position: fixed; inset: 0; z-index: 50; background: rgba(15, 30, 49, .55); display: flex; align-items: flex-end; justify-content: center; padding: 0; }
+.caja-compartir { position: relative; width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; background: var(--color-fondo); border-radius: 28px 28px 0 0; padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)); text-align: center; }
+@media (min-width: 600px) { .capa-compartir { align-items: center; } .caja-compartir { border-radius: 28px; } }
+.caja-compartir h2 { margin: 4px 0 4px; font-size: 22px; font-weight: 800; }
+.cerrar-capa { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 20px; border: 0; background: var(--color-control); color: var(--color-texto); font-size: 18px; }
+.qr-app { display: block; width: min(260px, 70vw); height: auto; margin: 14px auto 8px; padding: 12px; background: #fff; border-radius: 20px; box-sizing: border-box; }
+.enlace-app { margin: 0 0 4px; font-weight: 700; color: var(--color-acento); }
+.pasos-instalar ol { text-align: left; margin: 12px 0 0; padding: 0; list-style: none; counter-reset: paso; display: flex; flex-direction: column; gap: 8px; }
+.pasos-instalar li { counter-increment: paso; position: relative; background: var(--color-tarjeta); border-radius: 16px; padding: 12px 14px 12px 52px; display: flex; flex-direction: column; gap: 2px; }
+.pasos-instalar li::before { content: counter(paso); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 13px; background: var(--color-heroe); color: #fff; font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+.pasos-instalar li span { color: var(--color-texto-suave); font-size: 14px; }
+body.sin-scroll { overflow: hidden; }

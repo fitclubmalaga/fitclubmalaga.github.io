@@ -177,7 +177,8 @@
     pintar([
       h('div', { clase: 'marca' }, [logoClub(), h('h1', { clase: 'solo-lector', texto: 'Fitclub Málaga' }), h('p', { texto: 'Entrenamientos al aire libre' })]),
       opcion('Ya soy socio', 'Entra con tu email: te enviaremos un código.', 'principal', function () { pantallaAcceso(); }),
-      opcion('Es mi primera vez', 'Date de alta en 3 pasos: tus datos, confirmar tu email y la aprobación del club.', '', function () { pantallaAlta(); })
+      opcion('Es mi primera vez', 'Date de alta en 3 pasos: tus datos, confirmar tu email y la aprobación del club.', '', function () { pantallaAlta(); }),
+      h('button', { clase: 'boton enlace', type: 'button', id: 'comoInstalar', texto: '¿Cómo instalo la app en el móvil?', alClick: function () { window.FitclubCompartir.abrir(h); } })
     ], false);
   }
 
@@ -535,6 +536,9 @@
         h('div', { clase: 'fila' }, [h('span', { texto: 'Email' }), h('span', { clase: 'valor', texto: u.email })]),
         h('div', { clase: 'fila' }, [h('span', { texto: 'Rol' }), h('span', { clase: 'etiqueta', texto: NOMBRES_ROL[u.rol] || u.rol })])
       ]),
+      h('p', { clase: 'seccion', texto: 'Comparte la app' }),
+      h('button', { clase: 'boton secundario', type: 'button', id: 'abrirQR', style: 'margin-top:0', texto: u.rol === 'USUARIO' ? 'Código QR para instalarla' : 'Enseñar el QR y cómo instalarla',
+        alClick: function () { window.FitclubCompartir.abrir(h); } }),
       botonSalir(),
       h('div', { style: 'margin-top:28px' }, [logoClub('pequeno')]),
       h('p', { clase: 'subtitulo', style: 'text-align:center;margin-top:8px', texto: 'Versión ' + (inicio.version || '') })
