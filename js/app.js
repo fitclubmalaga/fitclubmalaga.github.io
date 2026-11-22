@@ -455,6 +455,7 @@
     var actual = menu.filter(function (m) { return m.id === estado.pestana; })[0] || { id: 'perfil', titulo: 'Perfil' };
     var u = inicio.usuario;
     var cabecera = h('div', { clase: 'cabecera' }, [h('h1', { texto: actual.titulo }), circulo(u)]);
+    if (actual.id === 'inicio' && window.VistaInicio) { pintar(window.VistaInicio(UI, u), true); return; } // trae su propia cabecera
     var vista = actual.id === 'perfil' ? vistaPerfil(inicio) : actual.id === 'usuarios' ? vistaUsuarios()
       : actual.id === 'sesiones' && u.rol === 'COACH' && window.VistaCoachSesiones ? window.VistaCoachSesiones(UI, u)
       : actual.id === 'participantes' && u.rol === 'COACH' && window.VistaParticipantes ? window.VistaParticipantes(UI, u)
@@ -472,8 +473,8 @@
       var n = avisos[m.id] || 0;
       $pestanasInt.appendChild(h('button', { type: 'button', 'aria-current': m.id === estado.pestana ? 'page' : false,
         'aria-label': m.titulo + (n ? ', ' + n + ' pendientes' : ''),
-        alClick: function () { if (m.id !== 'usuarios') gestion.detalle = null; estado.pestana = m.id; mostrarInicio(estado.inicio); } },
-        [icono(m.icono), h('span', { texto: m.titulo }), n ? h('span', { clase: 'insignia', 'aria-hidden': 'true', texto: String(n) }) : null]));
+        alClick: function () { if (m.id !== 'usuarios') gestion.detalle = null; estado.pestana = m.id; mostrarInicio(estado.inicio); window.scrollTo(0, 0); } },
+        [icono(m.icono, 22), h('span', { clase: 'texto-pestana', texto: m.titulo }), n ? h('span', { clase: 'insignia', 'aria-hidden': 'true', texto: String(n) }) : null]));
     });
   }
 
@@ -551,7 +552,7 @@
   function botonSalir() {
     return h('button', { clase: 'boton secundario', type: 'button', texto: 'Cerrar sesión en este móvil', alClick: function (ev) {
       ev.target.disabled = true;
-      var fin = function () { Api.olvidarSesion(); estado.pestana = null; if (window.VistaAgenda) window.VistaAgenda.reiniciar(); if (window.VistaReservas) window.VistaReservas.reiniciar(); if (window.FitclubEquipo) window.FitclubEquipo.reiniciar(); pantallaBienvenida(); };
+      var fin = function () { Api.olvidarSesion(); estado.pestana = null; if (window.VistaAgenda) window.VistaAgenda.reiniciar(); if (window.VistaReservas) window.VistaReservas.reiniciar(); if (window.FitclubEquipo) window.FitclubEquipo.reiniciar(); if (window.VistaInicio) window.VistaInicio.reiniciar(); pantallaBienvenida(); };
       Api.llamar('acceso.cerrarSesion').then(fin, fin);
     } });
   }
@@ -576,7 +577,8 @@
   }
 
   // Utilidades compartidas con las vistas de otros archivos (js/agenda.js…).
-  var UI = { h: h, icono: icono, aviso: aviso, campo: campo, Api: Api, circulo: circulo };
+  var UI = { h: h, icono: icono, aviso: aviso, campo: campo, Api: Api, circulo: circulo,
+    irA: function (id) { if (id !== 'usuarios') gestion.detalle = null; estado.pestana = id; mostrarInicio(estado.inicio); window.scrollTo(0, 0); } };
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   arrancar();

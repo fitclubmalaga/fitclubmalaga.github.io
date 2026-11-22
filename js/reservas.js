@@ -38,7 +38,7 @@
       return h('div', { clase: 'tarjeta reserva' }, [
         h('div', { clase: 'reserva-fecha' }, [h('strong', { texto: String(+r.fecha.slice(8)) }), h('small', { texto: MESES[+r.fecha.slice(5, 7) - 1] })]),
         h('div', { clase: 'principal', style: 'flex:1;min-width:0' }, [
-          h('span', { clase: 'reserva-titulo', texto: r.actividad }),
+          h('span', { clase: 'reserva-titulo', style: 'display:flex;align-items:center;gap:8px' }, [window.FitclubActividad.miniatura(h, r, 24), r.actividad]),
           h('small', { texto: r.dia + ' · ' + r.hora_inicio + '-' + r.hora_fin }),
           h('small', { clase: 'con-coach' }, [r.lugar + (r.coach ? ' · ' : ''), r.coach ? h('span', { clase: 'coach-nombre' }, [U.circulo({ nombre: r.coach, apellidos: '', foto: r.coach_foto }, { clase: 'micro', ampliable: true }), ' ' + r.coach]) : null]),
           conAcciones ? h('span', { clase: 'etiqueta ok', style: 'margin-top:6px;display:inline-block', texto: 'Reservada ✓' }) : null
@@ -53,6 +53,7 @@
       var texto = r.pasada && r.estado === 'CONFIRMADA' ? 'Pasada' : r.estado_texto;
       var clase = r.estado === 'CANCELADA_TARDE' || r.estado === 'CANCELADA_CLUB' ? 'etiqueta aviso' : 'etiqueta';
       return h('div', { clase: 'fila' }, [
+        window.FitclubActividad.miniatura(h, r, 32),
         h('div', { clase: 'principal', style: 'flex:1' }, [h('span', { texto: r.actividad }), h('small', { texto: r.dia + ' ' + diaMes(r.fecha) + ' · ' + r.hora_inicio + ' · ' + r.lugar })]),
         h('span', { clase: clase, texto: texto })
       ]);

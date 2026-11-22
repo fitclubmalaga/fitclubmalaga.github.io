@@ -150,7 +150,8 @@
       var cancelada = s.estado === 'CANCELADA';
       var contenido = [
         h('div', { clase: 'hora' }, [h('strong', { texto: s.hora_inicio }), h('small', { texto: s.hora_fin })]),
-        h('div', { clase: 'barra' + (cancelada ? ' apagada' : '') }),
+        window.FitclubActividad ? (function () { var m = window.FitclubActividad.miniatura(h, s, 36); if (cancelada) m.style.opacity = '.35'; return m; })()
+          : h('div', { clase: 'barra' + (cancelada ? ' apagada' : '') }),
         h('div', { clase: 'principal', style: 'flex:1' }, [
           h('span', { style: cancelada ? 'text-decoration:line-through' : '', texto: s.actividad }),
           h('small', { clase: 'con-coach' }, [s.lugar + (s.coach ? ' · ' : ''), s.coach ? h('span', { clase: 'coach-nombre' }, [U.circulo({ nombre: s.coach, apellidos: '', foto: s.coach_foto }, { clase: 'micro', ampliable: !esBoss }), ' ' + s.coach]) : null]),
@@ -407,6 +408,7 @@
       nodos.push(h('div', { clase: 'grupo', style: 'margin-top:12px' }, g.actividades.map(function (a) {
         var franjas = a.horario.map(function (x) { return DIAS_CORTOS[x.dia_semana] + ' ' + x.hora_inicio; }).join(', ') || 'Sin horario';
         return h('button', { clase: 'fila', type: 'button', alClick: function () { ui.editando = function () { return editorActividad(a); }; repintar(); } }, [
+          window.FitclubActividad.miniatura(h, a, 40),
           h('div', { clase: 'principal' }, [h('span', { texto: a.nombre }), h('small', { texto: franjas }), h('small', { texto: (lugares[a.lugar_id] || '') + ' · ' + (a.cupo === '' ? 'sin límite' : a.cupo + ' plazas') })]),
           a.activa ? U.icono('chev', 18) : h('span', { clase: 'etiqueta', texto: 'Inactiva' })
         ]);
@@ -426,6 +428,25 @@
       var dias = h('input', { type: 'number', id: 'aDias', min: '0', max: '60', inputmode: 'numeric', placeholder: 'General: ' + g.general.dias_apertura, value: a.dias_apertura === '' ? '' : String(a.dias_apertura) });
       var activa = h('input', { type: 'checkbox', id: 'aActiva' }); activa.checked = a.activa !== false;
       var mostrar = h('input', { type: 'checkbox', id: 'aMostrar' }); mostrar.checked = a.mostrar_antes !== false;
+      // Color e icono: «Automático» = el servidor elige (icono por el nombre, color fijo por actividad).
+      var FA = window.FitclubActividad;
+      var eleccion = { color: a.color_elegido || '', icono: a.icono_elegido || '' };
+      var muestra = h('span', {});
+      function pintarMuestra() { muestra.innerHTML = ''; muestra.appendChild(FA.miniatura(h, { color: eleccion.color || a.color || '#475569', icono: eleccion.icono || a.icono || 'fuerza' }, 46)); }
+      function selector(clase, valores, clave, dibujo, etiqueta) {
+        var caja = h('div', { clase: clase, role: 'group', 'aria-label': etiqueta });
+        function marcar() { caja.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b._v === eleccion[clave] ? 'true' : 'false'); }); pintarMuestra(); }
+        [''].concat(valores).forEach(function (v) {
+          var b = v ? dibujo(v) : h('button', { type: 'button', clase: 'auto', texto: 'Automático' });
+          b._v = v; b.addEventListener('click', function () { eleccion[clave] = v; marcar(); });
+          caja.appendChild(b);
+        });
+        marcar();
+        return caja;
+      }
+      var selColor = selector('selector-color', FA.colores, 'color', function (c) { return h('button', { type: 'button', style: 'background:' + c, 'aria-label': 'Color ' + c, id: 'aColor' + c.slice(1) }); }, 'Color de la actividad');
+      var NOMBRES_ICONO = { fuerza: 'Fuerza', run: 'Correr', yoga: 'Yoga', bici: 'Bici', agua: 'Agua', cardio: 'Cardio' };
+      var selIcono = selector('selector-icono', FA.iconos, 'icono', function (n) { var b = h('button', { type: 'button', 'aria-label': 'Icono ' + NOMBRES_ICONO[n], id: 'aIcono' + n }); b.appendChild(FA.svg(n, 22)); return b; }, 'Icono de la actividad');
       var franjas = h('div', {});
       var filas = (a.horario || []).map(function (x) { return { dia_semana: x.dia_semana, hora_inicio: x.hora_inicio, hora_fin: x.hora_fin }; });
       function pintarFranjas() {
@@ -446,7 +467,7 @@
       var bGuardar = h('button', { clase: 'boton', type: 'button', texto: 'Guardar actividad', alClick: function () {
         bGuardar.disabled = true; bGuardar.textContent = 'Guardando…'; zona.innerHTML = '';
         U.Api.llamar('actividades.guardar', { id: a.id, nombre: nombre.value, descripcion: desc.value, lugar_id: lugar.value, coach_id: coach.value,
-          cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, mostrar_antes: mostrar.checked, horario: filas })
+          cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, mostrar_antes: mostrar.checked, horario: filas, color: eleccion.color, icono: eleccion.icono })
           .then(function (d) { ui.gestion = d; ui.opciones = null; ui.editando = null; repintar(); })
           .catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = 'Guardar actividad'; zona.appendChild(aviso('error', e.mensaje)); });
       } });
@@ -456,6 +477,8 @@
           U.campo('Nombre', nombre), U.campo('Descripción (la verán los clientes)', desc),
           U.campo('Lugar', lugar), U.campo('Coach', coach),
           U.campo('Plazas por sesión', cupo, 'Vacío = sin límite. Puedes ponerlo cuando quieras.'),
+          h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Color e icono (se ven en el Inicio y en la Agenda)' }),
+          h('div', { style: 'display:flex;gap:14px;align-items:flex-start;margin-bottom:12px' }, [muestra, h('div', { style: 'display:flex;flex-direction:column;gap:10px;flex:1' }, [selColor, selIcono])]),
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Horario semanal' }), franjas, anadir,
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Reservas (vacío = valor general)' }),
           h('div', { clase: 'dos' }, [U.campo('Horas para cancelar', horas), U.campo('Días de apertura', dias)]),

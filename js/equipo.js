@@ -12,11 +12,17 @@
 
   // ------------------------------------------------------------------ lista de una sesión (Coach y Boss)
   /** Pinta la lista de la sesión en `caja`. `volver` = función para salir. */
-  function pintarLista(U, caja, sesionId, volver) {
+  /**
+   * opciones.compacta: sin «Volver» ni cabecera (para pasar lista dentro de una tarjeta del Inicio).
+   * opciones.alGuardar(r): tras guardar la lista o añadir a alguien.
+   */
+  function pintarLista(U, caja, sesionId, volver, opciones) {
     var h = U.h, aviso = U.aviso;
+    opciones = opciones || {};
+    var compacta = !!opciones.compacta;
     zonaAnadir.U = U;
     caja.innerHTML = '';
-    caja.appendChild(h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: volver }));
+    if (!compacta) caja.appendChild(h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: volver }));
     caja.appendChild(h('div', { clase: 'cargando', style: 'min-height:20vh', texto: 'Cargando la lista…' }));
     U.Api.llamar('sesion.participantes', { sesion_id: sesionId }).then(function (d) { dibujar(d); })
       .catch(function (e) { caja.appendChild(aviso('error', e.mensaje)); });
@@ -25,19 +31,22 @@
       var s = d.sesion;
       var marcas = {}; // usuario_id → estado nuevo (solo lo cambiado)
       caja.innerHTML = '';
-      caja.appendChild(h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: volver }));
-      caja.appendChild(h('div', { clase: 'tarjeta cabecera-lista' }, [
-        h('h2', { texto: s.actividad }),
-        h('p', { clase: 'subtitulo', texto: s.dia + ' ' + diaMes(s.fecha) + ' · ' + s.hora_inicio + '-' + s.hora_fin + ' · ' + s.lugar }),
-        h('div', { clase: 'chips' }, [
-          h('span', { clase: 'chip', texto: plural(d.resumen.apuntados, 'apuntado', 'apuntados') + (s.cupo !== '' ? ' de ' + s.cupo : '') }),
-          h('span', { clase: 'chip ok', id: 'cAsis', texto: plural(d.resumen.asistieron, 'vino', 'vinieron') }),
-          h('span', { clase: 'chip mal', id: 'cFaltas', texto: plural(d.resumen.faltaron, 'faltó', 'faltaron') })
-        ])
-      ]));
+      var chipAsis = h('span', { clase: 'chip ok', texto: plural(d.resumen.asistieron, 'vino', 'vinieron') });
+      var chipFaltas = h('span', { clase: 'chip mal', texto: plural(d.resumen.faltaron, 'faltó', 'faltaron') });
+      var chips = h('div', { clase: 'chips' }, [
+        h('span', { clase: 'chip', texto: plural(d.resumen.apuntados, 'apuntado', 'apuntados') + (s.cupo !== '' ? ' de ' + s.cupo : '') }), chipAsis, chipFaltas]);
+      if (compacta) caja.appendChild(chips);
+      else {
+        caja.appendChild(h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: volver }));
+        caja.appendChild(h('div', { clase: 'tarjeta cabecera-lista' }, [
+          h('h2', { texto: s.actividad }),
+          h('p', { clase: 'subtitulo', texto: s.dia + ' ' + diaMes(s.fecha) + ' · ' + s.hora_inicio + '-' + s.hora_fin + ' · ' + s.lugar }),
+          chips
+        ]));
+      }
       if (mensaje) caja.appendChild(aviso('ok', mensaje));
       if (!d.puede_pasar_lista) caja.appendChild(h('div', { clase: 'aviso info', texto: d.motivo_lista }));
-      var anadir = s.estado === 'PROGRAMADA' ? zonaAnadir(s, function (r) { dibujar(r, r.mensaje); }) : null;
+      var anadir = s.estado === 'PROGRAMADA' ? zonaAnadir(s, function (r) { if (opciones.alGuardar) opciones.alGuardar(r); dibujar(r, r.mensaje); }) : null;
       if (!d.participantes.length) {
         caja.appendChild(h('div', { clase: 'vacio tarjeta' }, [h('p', { texto: 'Aún no hay nadie apuntado.' })]));
         if (anadir) caja.appendChild(anadir);
@@ -50,8 +59,8 @@
       function contar() {
         var v = 0, f = 0;
         d.participantes.forEach(function (p) { var a = actual(p); if (a === 'ASISTIO') v++; else if (a === 'FALTA') f++; });
-        document.getElementById('cAsis').textContent = plural(v, 'vino', 'vinieron');
-        document.getElementById('cFaltas').textContent = plural(f, 'faltó', 'faltaron');
+        chipAsis.textContent = plural(v, 'vino', 'vinieron');
+        chipFaltas.textContent = plural(f, 'faltó', 'faltaron');
         bGuardar.disabled = !Object.keys(marcas).length;
       }
       var filas = d.participantes.map(function (p) {
@@ -92,7 +101,7 @@
       function guardar() {
         var lista = Object.keys(marcas).map(function (k) { return { usuario_id: k, estado: marcas[k] }; });
         bGuardar.disabled = true; bGuardar.textContent = 'Guardando…'; zona.innerHTML = '';
-        U.Api.llamar('asistencia.guardar', { sesion_id: s.id, marcas: lista }).then(function (r) { estado.mias = null; estado.resumen = null; dibujar(r, r.mensaje); })
+        U.Api.llamar('asistencia.guardar', { sesion_id: s.id, marcas: lista }).then(function (r) { estado.mias = null; estado.resumen = null; if (opciones.alGuardar) opciones.alGuardar(r); dibujar(r, r.mensaje); })
           .catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = 'Guardar lista'; zona.appendChild(aviso('error', e.mensaje)); });
       }
     }
@@ -190,7 +199,7 @@
         : s.pasada && s.lista_pasada ? h('span', { clase: 'etiqueta ok', texto: 'Lista ✓' }) : null;
       return h('button', { clase: 'fila sesion', type: 'button', 'aria-label': 'Lista de ' + s.actividad + ' ' + s.dia + ' ' + s.hora_inicio, alClick: function () { estado.lista = s.id; pintar(); } }, [
         h('div', { clase: 'hora' }, [h('strong', { texto: s.hora_inicio }), h('small', { texto: s.hora_fin })]),
-        h('div', { clase: 'barra' + (cancelada ? ' apagada' : '') }),
+        (function () { var m = window.FitclubActividad.miniatura(h, s, 36); if (cancelada) m.style.opacity = '.35'; return m; })(),
         h('div', { clase: 'principal', style: 'flex:1;min-width:0' }, [
           h('span', { style: cancelada ? 'text-decoration:line-through' : '', texto: s.actividad }),
           h('small', { texto: s.lugar + (s.pasada ? '' : ' · ' + (s.fecha ? s.dia + ' ' + diaMes(s.fecha) : '')) }),
@@ -311,7 +320,7 @@
       else caja.appendChild(h('div', { clase: 'grupo' }, d.hoy_sesiones.map(function (s) {
         return h('button', { clase: 'fila sesion', type: 'button', 'aria-label': 'Lista de ' + s.actividad + ' ' + s.hora_inicio, alClick: function () { lista = s.id; pintar(); } }, [
           h('div', { clase: 'hora' }, [h('strong', { texto: s.hora_inicio }), h('small', { texto: s.hora_fin })]),
-          h('div', { clase: 'barra' }),
+          window.FitclubActividad.miniatura(h, s, 36),
           h('div', { clase: 'principal', style: 'flex:1;min-width:0' }, [h('span', { texto: s.actividad }), h('small', { texto: s.lugar + (s.coach ? ' · ' + s.coach : '') }),
             h('small', { texto: plural(s.apuntados, 'apuntado', 'apuntados') + (s.cupo !== '' ? ' de ' + s.cupo : '') })]),
           U.icono('chev', 18)
