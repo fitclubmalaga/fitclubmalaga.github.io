@@ -177,6 +177,30 @@
     return pic;
   }
 
+  // ---------- «Mi sede» del cliente (v0.12): sale la primera en su Agenda ----------
+  function seccionMiSede() {
+    var caja = h('div', {}, [h('p', { clase: 'seccion', texto: 'Mi sede' })]);
+    var zona = h('div', {});
+    var sel = h('select', { id: 'miSede', 'aria-label': 'Mi sede' }, [h('option', { value: '', texto: 'Cargando…' })]);
+    sel.disabled = true;
+    caja.appendChild(sel);
+    caja.appendChild(h('p', { clase: 'subtitulo', style: 'margin:6px 4px 0', texto: 'Saldrá la primera en tu Agenda. Si no eliges ninguna, se usa la sede donde más reservas.' }));
+    caja.appendChild(zona);
+    function pintar(d) {
+      sel.innerHTML = '';
+      sel.appendChild(h('option', { value: '', texto: 'Sin elegir' }));
+      d.sedes.forEach(function (l) { sel.appendChild(h('option', { value: l.id, selected: l.id === d.sede_id ? 'selected' : null, texto: l.nombre })); });
+      sel.value = d.sede_id; sel.disabled = false;
+    }
+    Api.llamar('perfil.sedes').then(pintar).catch(function (e) { zona.appendChild(aviso('error', e.mensaje)); });
+    sel.addEventListener('change', function () {
+      zona.innerHTML = ''; sel.disabled = true;
+      Api.llamar('perfil.guardarSede', { lugar_id: sel.value }).then(function (d) { pintar(d); zona.appendChild(aviso('ok', d.mensaje)); if (window.VistaAgenda && window.VistaAgenda.reiniciar) window.VistaAgenda.reiniciar(); })
+        .catch(function (e) { sel.disabled = false; zona.appendChild(aviso('error', e.mensaje)); });
+    });
+    return caja;
+  }
+
   // ---------- apariencia: automática (según el móvil), clara u oscura; se guarda en este móvil ----------
   function temaElegido() {
     var t = document.documentElement.getAttribute('data-tema');
@@ -562,6 +586,7 @@
         h('div', { clase: 'fila' }, [h('span', { texto: 'Email' }), h('span', { clase: 'valor', texto: u.email })]),
         h('div', { clase: 'fila' }, [h('span', { texto: 'Rol' }), h('span', { clase: 'etiqueta', texto: NOMBRES_ROL[u.rol] || u.rol })])
       ]),
+      u.rol === 'USUARIO' ? seccionMiSede() : null,
       h('p', { clase: 'seccion', texto: 'Apariencia' }),
       selectorTema(function () { mostrarInicio(estado.inicio); }),
       h('p', { clase: 'subtitulo', style: 'margin:6px 4px 0', texto: 'Automática sigue el modo claro u oscuro de tu móvil. La elección se guarda en este móvil.' }),

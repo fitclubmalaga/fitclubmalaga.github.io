@@ -120,7 +120,7 @@ input[type=time], input[type=number] { width: 100%; padding: 12px 10px; border-r
 a.mapa { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 600; color: var(--color-acento); text-decoration: none; white-space: nowrap; }
 .fila a.mapa { align-self: center; flex: none; }
 /* Lugares: tarjeta con la miniatura del mapa a la derecha (21-11; compactada a petición de Miguel) */
-.tarjeta.lugar { display: grid; grid-template-columns: minmax(0, 1fr) 36%; padding: 0; overflow: hidden; margin-top: 10px; min-height: 104px; }
+.tarjeta.lugar { display: grid; grid-template-columns: auto minmax(0, 1fr) 36%; padding: 0; overflow: hidden; margin-top: 10px; min-height: 104px; }
 .tarjeta.lugar.inactivo { opacity: .65; }
 .lugar-datos { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 10px 10px 14px; border: 0; background: none; text-align: left; color: var(--color-texto); min-width: 0; }
 .lugar-datos strong { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
@@ -352,3 +352,14 @@ body.sin-scroll { overflow: hidden; }
 .precio-fila { display: flex; align-items: center; gap: 8px; }
 .precio-fila .euro { font-weight: 700; color: var(--color-texto-suave); }
 .inscripcion-editor { margin-bottom: 12px; }
+
+/* ---- 0.12.0: ordenar sedes arrastrando y «Mi sede» ---- */
+.lista-lugares { display: flex; flex-direction: column; }
+.tarjeta.lugar { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.lugar-orden { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0 0 0 8px; }
+.lugar-orden .asa { font-size: 20px; line-height: 1; color: var(--color-texto-suave); cursor: grab; touch-action: none; padding: 4px 2px; }
+.lugar-orden .flecha { width: 30px; height: 26px; border: 0; border-radius: 8px; background: var(--color-control); color: var(--color-texto); font-size: 14px; font-weight: 700; padding: 0; }
+.lugar-orden .flecha:disabled { opacity: .35; }
+.tarjeta.lugar.arrastrando { position: relative; z-index: 5; box-shadow: 0 12px 28px rgba(15, 30, 49, .25); transition: none; cursor: grabbing; }
+.sede-tarjeta.mia { border-color: var(--color-ok); }
+.sede-mia { align-self: flex-start; margin: -2px 4px 0; padding: 1px 8px; border-radius: 10px; background: var(--color-ok-suave); color: var(--color-ok); font-size: 11px; font-weight: 700; }

@@ -148,9 +148,11 @@
         var carrusel = h('div', { clase: 'sedes-carrusel', role: 'group', 'aria-label': 'Elegir sede' }, [{ id: '', nombre: 'Todas las sedes' }].concat(sedes).map(function (l) {
           var n = l.id ? (cuentas[l.id] || 0) : total;
           var mapa = h('span', { clase: 'sede-mapa' + (l.id ? '' : ' todas'), 'aria-hidden': 'true', style: l.id ? estiloMapa(l.ubicacion, 104, 56) : '' }, [U.icono(l.id ? 'pin' : 'mapa', l.id ? 20 : 22)]);
-          return h('button', { type: 'button', clase: 'sede-tarjeta', 'aria-pressed': sede === l.id ? 'true' : 'false',
-            'aria-label': l.nombre + ': ' + plural(n, 'sesión', 'sesiones') + ' esta semana', alClick: function () { elegirSede(l.id); repintar(); } }, [
-            mapa, h('span', { clase: 'sede-nombre', texto: l.nombre }), h('span', { clase: 'sede-cuenta', texto: plural(n, 'sesión', 'sesiones') })
+          var esMia = d.mi_sede && l.id === d.mi_sede; // «Mi sede» del cliente (v0.12)
+          return h('button', { type: 'button', clase: 'sede-tarjeta' + (esMia ? ' mia' : ''), 'aria-pressed': sede === l.id ? 'true' : 'false',
+            'aria-label': l.nombre + (esMia ? ', tu sede' : '') + ': ' + plural(n, 'sesión', 'sesiones') + ' esta semana', alClick: function () { elegirSede(l.id); repintar(); } }, [
+            mapa, esMia ? h('span', { clase: 'sede-mia', texto: 'Tu sede' }) : null,
+            h('span', { clase: 'sede-nombre', texto: l.nombre }), h('span', { clase: 'sede-cuenta', texto: plural(n, 'sesión', 'sesiones') })
           ]);
         }));
         nodos.push(carrusel);
@@ -670,9 +672,31 @@
       var nodos = [h('button', { clase: 'boton', type: 'button', texto: '+ Nuevo lugar', alClick: function () { ui.editando = function () { return editorLugar(null); }; repintar(); } })];
       if (!g.lugares.length) { nodos.push(h('div', { clase: 'vacio tarjeta', style: 'margin-top:12px' }, [h('p', { texto: 'Aún no hay lugares. Crea el primero: por ejemplo, «La Malagueta».' })])); return nodos; }
       // Son pocos lugares (menos de 10): tarjetas con la miniatura del mapa a la derecha.
-      g.lugares.forEach(function (l) {
+      // Orden (v0.12): mantener pulsada una sede (o su asa ⠿) y arrastrar; también con las flechas. Es el orden de la Agenda.
+      if (g.lugares.length > 1) nodos.push(h('p', { clase: 'subtitulo', style: 'margin:10px 4px 6px', texto: 'Mantén pulsada una sede y arrástrala para cambiar el orden en que salen en la Agenda.' }));
+      if (ui.resultado) { nodos.push(aviso('ok', ui.resultado)); ui.resultado = null; }
+      var listaL = h('div', { clase: 'lista-lugares', id: 'listaLugares' });
+      var zonaOrden = h('div', {});
+      function guardarOrden() {
+        var ids = Array.prototype.map.call(listaL.children, function (c) { return c.dataset.id; });
+        zonaOrden.innerHTML = '';
+        U.Api.llamar('lugares.ordenar', { ids: ids }).then(function (d) { ui.gestion = d; ui.semana = null; ui.resultado = 'Orden guardado.'; repintar(); })
+          .catch(function (e) { zonaOrden.appendChild(aviso('error', e.mensaje)); });
+      }
+      function mover(tarjeta, paso) {
+        var hermano = paso < 0 ? tarjeta.previousElementSibling : tarjeta.nextElementSibling;
+        if (!hermano) return;
+        if (paso < 0) listaL.insertBefore(tarjeta, hermano); else listaL.insertBefore(hermano, tarjeta);
+        guardarOrden();
+      }
+      g.lugares.forEach(function (l, i) {
         var editar = function () { ui.editando = function () { return editorLugar(l); }; repintar(); };
-        nodos.push(h('div', { clase: 'tarjeta lugar' + (l.activo ? '' : ' inactivo') }, [
+        var tarjeta = h('div', { clase: 'tarjeta lugar' + (l.activo ? '' : ' inactivo'), 'data-id': l.id }, [
+          h('div', { clase: 'lugar-orden' }, [
+            h('span', { clase: 'asa', 'aria-hidden': 'true', title: 'Arrastrar', texto: '⠿' }),
+            h('button', { clase: 'flecha', type: 'button', 'aria-label': 'Subir ' + l.nombre, texto: '↑', disabled: i === 0 ? 'disabled' : null, alClick: function () { mover(tarjeta, -1); } }),
+            h('button', { clase: 'flecha', type: 'button', 'aria-label': 'Bajar ' + l.nombre, texto: '↓', disabled: i === g.lugares.length - 1 ? 'disabled' : null, alClick: function () { mover(tarjeta, 1); } })
+          ]),
           h('button', { clase: 'lugar-datos', type: 'button', 'aria-label': 'Editar ' + l.nombre, alClick: editar }, [
             h('strong', { texto: l.nombre }),
             h('small', { texto: l.direccion || 'Sin dirección' }),
@@ -681,9 +705,54 @@
             h('span', { clase: 'lugar-editar', texto: 'Editar ›' })
           ]),
           miniatura(l)
-        ]));
+        ]);
+        arrastrable(tarjeta, listaL, guardarOrden);
+        listaL.appendChild(tarjeta);
       });
+      nodos.push(listaL, zonaOrden);
       return nodos;
+    }
+
+    /**
+     * Arrastrar para ordenar (v0.12): desde el asa, al momento; desde el resto de la tarjeta, manteniendo pulsado 350 ms
+     * (así deslizar la página sigue funcionando). Al soltar, si cambió el orden, llama a `alSoltar`.
+     */
+    function arrastrable(el, lista, alSoltar) {
+      var temp = null, arrastrando = false, y0 = 0, orden0 = '', ptr = null;
+      function empezar(ev) {
+        arrastrando = true; y0 = ev.clientY; orden0 = Array.prototype.map.call(lista.children, function (c) { return c.dataset.id; }).join();
+        el.classList.add('arrastrando');
+        try { el.setPointerCapture(ev.pointerId); } catch (e) { /* sin captura */ }
+        if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) { /* sin vibración */ }
+      }
+      el.addEventListener('pointerdown', function (ev) {
+        if (ev.button > 0) return;
+        ptr = ev;
+        if (ev.target.closest && ev.target.closest('.asa')) { ev.preventDefault(); empezar(ev); return; }
+        if (ev.target.closest && ev.target.closest('.flecha, a, iframe')) return;
+        temp = setTimeout(function () { temp = null; empezar(ptr); }, 350);
+      });
+      el.addEventListener('pointermove', function (ev) {
+        if (temp && Math.abs(ev.clientY - ptr.clientY) > 8) { clearTimeout(temp); temp = null; }
+        if (!arrastrando) return;
+        ev.preventDefault();
+        el.style.transform = 'translateY(' + (ev.clientY - y0) + 'px)';
+        var hermanos = Array.prototype.filter.call(lista.children, function (c) { return c !== el; });
+        var destino = null;
+        for (var i = 0; i < hermanos.length; i++) { var r = hermanos[i].getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { destino = hermanos[i]; break; } }
+        var antes = el.getBoundingClientRect().top;
+        if (destino !== el.nextElementSibling) { lista.insertBefore(el, destino); y0 += el.getBoundingClientRect().top - antes; el.style.transform = 'translateY(' + (ev.clientY - y0) + 'px)'; }
+      });
+      function acabar() {
+        if (temp) { clearTimeout(temp); temp = null; }
+        if (!arrastrando) return;
+        arrastrando = false; el.classList.remove('arrastrando'); el.style.transform = '';
+        var orden = Array.prototype.map.call(lista.children, function (c) { return c.dataset.id; }).join();
+        if (orden !== orden0) alSoltar();
+      }
+      el.addEventListener('pointerup', acabar);
+      el.addEventListener('pointercancel', acabar);
+      el.addEventListener('click', function (ev) { if (el.classList.contains('arrastrando')) ev.preventDefault(); }, true);
     }
 
     /** Mapa pequeño del lugar; al tocarlo se abre Google Maps. */
