@@ -13,6 +13,33 @@
   try { sede = localStorage.getItem('fitclub_sede') || ''; } catch (e) { sede = ''; }
   function elegirSede(id) { sede = id; try { localStorage.setItem('fitclub_sede', id); } catch (e) { /* sin almacenamiento */ } }
 
+  // ---- Precios (hito 2.1) ----
+  /** 3500 → «35»; 550 → «5,50» (para los campos del editor). */
+  function importeCampo(cent) { if (cent === '' || cent === null || cent === undefined) return ''; var e = Math.floor(cent / 100), c = cent % 100; return e + (c ? ',' + (c < 10 ? '0' : '') + c : ''); }
+  /** Texto corto de un precio para la Agenda del cliente: «Suelta 5 €», «Bono 10: 40 €», «Mes 35 €». */
+  function precioCorto(t) {
+    return t.tipo === 'SUELTA' ? 'Suelta ' + t.precio : t.tipo === 'BONO' ? 'Bono ' + t.sesiones + ': ' + t.precio : t.tipo === 'MES' ? 'Mes ' + t.precio : 'Trimestre ' + t.precio;
+  }
+  /**
+   * Miniatura de mapa de una sede: teselas de OpenStreetMap centradas en su ubicación «lat,lng» (sin clave).
+   * Se usan las 4 teselas alrededor del punto, para que la tarjeta quede cubierta aunque caiga cerca de un borde.
+   */
+  function estiloMapa(ubicacion, ancho, alto) {
+    var m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(String(ubicacion || ''));
+    if (!m) return '';
+    var lat = Number(m[1]) * Math.PI / 180, lng = Number(m[2]), z = 15, n = Math.pow(2, z);
+    var x = (lng + 180) / 360 * n, y = (1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2 * n;
+    var tx = Math.floor(x), ty = Math.floor(y), px = (x - tx) * 256, py = (y - ty) * 256;
+    var dx = px < 128 ? -1 : 1, dy = py < 128 ? -1 : 1; // la tesela vecina hacia el lado más cercano
+    var imgs = [], pos = [];
+    [[0, 0], [dx, 0], [0, dy], [dx, dy]].forEach(function (d) {
+      imgs.push("url('https://tile.openstreetmap.org/" + z + '/' + (tx + d[0]) + '/' + (ty + d[1]) + ".png')");
+      pos.push(Math.round(ancho / 2 - px + d[0] * 256) + 'px ' + Math.round(alto / 2 - py + d[1] * 256) + 'px');
+    });
+    return 'background-image:' + imgs.join(',') + ';background-size:256px 256px;background-position:' + pos.join(',') + ';background-repeat:no-repeat';
+  }
+  window.FitclubMapa = { estilo: estiloMapa };
+
   function sumarDias(iso, n) {
     var p = iso.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
     return d.toISOString().slice(0, 10);
@@ -115,10 +142,22 @@
       var sedes = d.lugares || [];
       if (sede && !sedes.some(function (l) { return l.id === sede; })) sede = '';
       if (sedes.length > 1) {
-        nodos.push(h('div', { clase: 'filtro-sedes', role: 'group', 'aria-label': 'Filtrar por sede' }, [{ id: '', nombre: 'Todas' }].concat(sedes).map(function (l) {
-          return h('button', { type: 'button', 'aria-pressed': sede === l.id ? 'true' : 'false', texto: l.nombre, alClick: function () { elegirSede(l.id); repintar(); } });
-        })));
+        // Tarjetas de sede con su mapa (opción A de Miguel, 25-11): nombre entero, sesiones de la semana y la siguiente asomando.
+        var cuentas = {}, total = 0;
+        d.sesiones.forEach(function (s) { if (s.estado !== 'CANCELADA') { cuentas[s.lugar_id] = (cuentas[s.lugar_id] || 0) + 1; total++; } });
+        var carrusel = h('div', { clase: 'sedes-carrusel', role: 'group', 'aria-label': 'Elegir sede' }, [{ id: '', nombre: 'Todas las sedes' }].concat(sedes).map(function (l) {
+          var n = l.id ? (cuentas[l.id] || 0) : total;
+          var mapa = h('span', { clase: 'sede-mapa' + (l.id ? '' : ' todas'), 'aria-hidden': 'true', style: l.id ? estiloMapa(l.ubicacion, 104, 56) : '' }, [U.icono(l.id ? 'pin' : 'mapa', l.id ? 20 : 22)]);
+          return h('button', { type: 'button', clase: 'sede-tarjeta', 'aria-pressed': sede === l.id ? 'true' : 'false',
+            'aria-label': l.nombre + ': ' + plural(n, 'sesión', 'sesiones') + ' esta semana', alClick: function () { elegirSede(l.id); repintar(); } }, [
+            mapa, h('span', { clase: 'sede-nombre', texto: l.nombre }), h('span', { clase: 'sede-cuenta', texto: plural(n, 'sesión', 'sesiones') })
+          ]);
+        }));
+        nodos.push(carrusel);
+        if (sedes.some(function (l) { return l.ubicacion; })) nodos.push(h('small', { clase: 'osm', texto: 'Mapas © OpenStreetMap' }));
+        setTimeout(function () { var el = carrusel.querySelector('[aria-pressed=true]'); if (el && el.scrollIntoView) carrusel.scrollLeft = Math.max(0, el.offsetLeft - 16); }, 0);
       }
+      if (esCliente && d.inscripcion) nodos.push(h('p', { clase: 'inscripcion-club', texto: 'Inscripción en el club: ' + d.inscripcion.precio + ' (incluye camiseta)' }));
       var lista = sede ? d.sesiones.filter(function (s) { return s.lugar_id === sede; }) : d.sesiones;
       if (sede && d.sesiones.length && !lista.length) {
         var nombreSede = (sedes.filter(function (l) { return l.id === sede; })[0] || {}).nombre;
@@ -161,6 +200,10 @@
           (function () {
             var t = cancelada ? 'Cancelada' : [pl.texto, s.cupo === '' && s.ocupadas && !esCliente ? plural(s.ocupadas, 'apuntado', 'apuntados') : ''].filter(Boolean).join(' · ');
             return t ? h('small', { clase: pl.clase, texto: t }) : null;
+          })(),
+          (function () { // precios (hito 2.1), solo para el cliente
+            var pr = esCliente && !cancelada && ui.semana && ui.semana.precios ? ui.semana.precios[s.actividad_id] : null;
+            return pr ? h('small', { clase: 'precios', texto: pr.map(function (t) { return precioCorto(t).replace(/ /g, '\u00a0'); }).join(' · ') }) : null; // cada precio, sin partir
           })()
         ])
       ];
@@ -397,6 +440,24 @@
     }
 
     // ------------------------------------------------ actividades
+    /** Inscripción del club (incluye la camiseta): el Boss la cambia; el coach la ve. */
+    function tarjetaInscripcion(g) {
+      var ins = g.inscripcion;
+      if (!esBoss) return ins ? h('p', { clase: 'inscripcion-club', texto: 'Inscripción en el club: ' + ins.precio + ' (incluye camiseta)' }) : null;
+      var campo = h('input', { type: 'text', id: 'inscripcionClub', inputmode: 'decimal', autocomplete: 'off', placeholder: 'Sin inscripción', 'aria-label': 'Precio de la inscripción en euros' });
+      campo.value = ins ? importeCampo(ins.precio_cent) : '';
+      var zonaI = h('div', {});
+      var b = h('button', { clase: 'boton-mini', type: 'button', id: 'guardarInscripcion', texto: 'Guardar', alClick: function () {
+        b.disabled = true; zonaI.innerHTML = '';
+        U.Api.llamar('tarifas.guardarClub', { inscripcion: campo.value }).then(function (d) { ui.gestion = d; ui.resultado = d.mensaje; repintar(); })
+          .catch(function (e) { b.disabled = false; zonaI.appendChild(aviso('error', e.mensaje)); });
+      } });
+      return h('div', { clase: 'tarjeta inscripcion-editor' }, [
+        h('p', { clase: 'seccion', style: 'margin:0 0 6px', texto: 'Inscripción del club (incluye camiseta)' }),
+        h('div', { clase: 'precio-fila' }, [campo, h('span', { clase: 'euro', texto: '€' }), b]), zonaI
+      ]);
+    }
+
     function vistaActividades() {
       var g = ui.gestion;
       if (!g) return [];
@@ -408,6 +469,7 @@
       }
       if (ui.resultado) { nodos.push(aviso('ok', ui.resultado)); ui.resultado = null; }
       if (!esBoss) nodos.push(h('p', { clase: 'subtitulo', style: 'margin:0 4px 4px', texto: 'Las actividades que creas tú. Las que te asigna el Boss las cambia él.' }));
+      nodos.push(tarjetaInscripcion(g));
       nodos.push(h('button', { clase: 'boton', type: 'button', texto: '+ Nueva actividad', alClick: function () { ui.editando = function () { return editorActividad(null); }; repintar(); } }));
       if (!g.actividades.length) { nodos.push(h('div', { clase: 'vacio tarjeta', style: 'margin-top:12px' }, [h('p', { texto: esBoss ? 'Aún no hay actividades.' : 'Aún no has creado ninguna actividad.' })])); return nodos; }
       nodos.push(h('div', { clase: 'grupo', style: 'margin-top:12px' }, g.actividades.map(function (a) {
@@ -522,11 +584,60 @@
       pintarFranjas();
       var anadir = h('button', { clase: 'boton secundario', type: 'button', texto: '+ Añadir día y hora', alClick: function () { filas.push({ dia_semana: 1, hora_inicio: '19:00', hora_fin: '20:00' }); pintarFranjas(); } });
       var zona = h('div', {});
+      // ---- Precios (hito 2.1): suelta, mensualidad, trimestre y bonos (válidos también en otras actividades que puedas cambiar).
+      var g0 = ui.gestion || { actividades: [] };
+      var tarifasA = a.tarifas || [];
+      function tarifaDe(tipo) { return tarifasA.filter(function (x) { return x.tipo === tipo; })[0]; }
+      function campoPrecio(id, tipo) {
+        var c = h('input', { type: 'text', id: id, inputmode: 'decimal', autocomplete: 'off', placeholder: '—', 'aria-label': 'Precio en euros' });
+        c.value = tarifaDe(tipo) ? importeCampo(tarifaDe(tipo).precio_cent) : '';
+        return c;
+      }
+      var tSuelta = campoPrecio('tSuelta', 'SUELTA'), tMes = campoPrecio('tMes', 'MES'), tTri = campoPrecio('tTrimestre', 'TRIMESTRE');
+      var otras = g0.actividades.filter(function (x) { return x.id !== a.id; });
+      var listaBonos = h('div', { clase: 'bonos' });
+      function filaBono(b) {
+        var ses = h('input', { type: 'number', clase: 'bSesiones', min: '2', max: '100', inputmode: 'numeric', 'aria-label': 'Sesiones del bono' }); ses.value = b ? b.sesiones : '';
+        var dur = h('input', { type: 'number', clase: 'bDias', min: '7', max: '730', inputmode: 'numeric', 'aria-label': 'Días que dura el bono' }); dur.value = b ? b.dias_validez : '';
+        var pre = h('input', { type: 'text', clase: 'bPrecio', inputmode: 'decimal', autocomplete: 'off', 'aria-label': 'Precio del bono en euros' }); pre.value = b ? importeCampo(b.precio_cent) : '';
+        var casillas = otras.length ? h('div', { clase: 'bValidaEn', role: 'group', 'aria-label': 'También vale en' }, [h('small', { texto: 'También vale en:' })].concat(otras.map(function (o) {
+          var c = h('input', { type: 'checkbox', value: o.id }); c.checked = !!(b && b.valida_en && b.valida_en.indexOf(o.id) >= 0);
+          return h('label', { clase: 'casilla-mini' }, [c, h('span', { texto: o.nombre })]);
+        }))) : null;
+        var fila = h('div', { clase: 'bono-fila' }, [
+          h('div', { clase: 'bono-datos' }, [
+            h('label', {}, [h('small', { texto: 'Sesiones' }), ses]), h('label', {}, [h('small', { texto: 'Días' }), dur]),
+            h('label', {}, [h('small', { texto: 'Precio €' }), pre]),
+            h('button', { clase: 'boton-mini secundario', type: 'button', 'aria-label': 'Quitar este bono', texto: '✕', alClick: function () { fila.remove(); } })
+          ]), casillas]);
+        fila._leer = function () {
+          return { tipo: 'BONO', precio: pre.value, sesiones: ses.value === '' ? '' : Number(ses.value), dias_validez: dur.value === '' ? '' : Number(dur.value),
+            valida_en: casillas ? Array.prototype.slice.call(casillas.querySelectorAll('input:checked')).map(function (c) { return c.value; }) : [] };
+        };
+        return fila;
+      }
+      tarifasA.filter(function (x) { return x.tipo === 'BONO'; }).forEach(function (b) { listaBonos.appendChild(filaBono(b)); });
+      var bAnadirBono = h('button', { clase: 'boton-mini secundario', type: 'button', id: 'anadirBono', texto: '+ Añadir bono', alClick: function () { listaBonos.appendChild(filaBono(null)); } });
+      function leerTarifas() {
+        var l = [{ tipo: 'SUELTA', precio: tSuelta.value }, { tipo: 'MES', precio: tMes.value }, { tipo: 'TRIMESTRE', precio: tTri.value }]
+          .filter(function (x) { return String(x.precio).trim() !== ''; });
+        Array.prototype.forEach.call(listaBonos.children, function (f) { var b = f._leer(); if (String(b.precio).trim() !== '') l.push(b); });
+        return l;
+      }
+      var zonaPrecios = h('div', { clase: 'precios-editor' }, [
+        h('div', { clase: 'precios-tres' }, [
+          h('label', {}, [h('small', { texto: 'Sesión suelta €' }), tSuelta]), h('label', {}, [h('small', { texto: 'Mensualidad €' }), tMes]),
+          h('label', {}, [h('small', { texto: 'Trimestre €' }), tTri])]),
+        listaBonos, bAnadirBono,
+        h('p', { clase: 'subtitulo', style: 'margin:6px 0 0', texto: 'Vacío = no se ofrece. Cambiar un precio no cambia lo ya cobrado.' })
+      ]);
+
       var bGuardar = h('button', { clase: 'boton', type: 'button', texto: 'Guardar actividad', alClick: function () {
         bGuardar.disabled = true; bGuardar.textContent = 'Guardando…'; zona.innerHTML = '';
         var datos = { id: a.id, nombre: nombre.value, descripcion: desc.value, lugar_id: lugar.value, coach_id: coach.value,
           cupo: cupo.value, horas_cancelacion: horas.value, dias_apertura: dias.value, activa: activa.checked, mostrar_antes: mostrar.checked, horario: filas, color: eleccion.color, icono: eleccion.icono };
         if (eleccion.imagen !== null) datos.imagen = eleccion.imagen;
+        datos.tarifas = leerTarifas(); // siempre: así quitar un precio también se guarda
         U.Api.llamar('actividades.guardar', datos)
           .then(function (d) { ui.gestion = d; ui.opciones = null; ui.editando = null; repintar(); })
           .catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = 'Guardar actividad'; zona.appendChild(aviso('error', e.mensaje)); });
@@ -537,6 +648,7 @@
           U.campo('Nombre', nombre), U.campo('Descripción (la verán los clientes)', desc),
           U.campo('Lugar', lugar), esBoss ? U.campo('Coach', coach) : null,
           U.campo('Plazas por sesión', cupo, 'Vacío = sin límite. Puedes ponerlo cuando quieras.'),
+          h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Precios' }), zonaPrecios,
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Color e icono, o una imagen propia (se ven en el Inicio y en la Agenda)' }),
           h('div', { style: 'display:flex;gap:14px;align-items:flex-start;margin-bottom:12px' }, [muestra, h('div', { style: 'display:flex;flex-direction:column;gap:10px;flex:1;min-width:0' }, [selColor, selIcono, zonaImagen, avisoImg])]),
           h('p', { clase: 'seccion', style: 'margin-left:0', texto: 'Horario semanal' }), franjas, anadir,

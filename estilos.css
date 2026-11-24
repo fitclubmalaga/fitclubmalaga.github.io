@@ -326,3 +326,29 @@ button.fila-dia::after { content: '›'; color: var(--color-texto-suave); font-s
 .pasos-instalar li::before { content: counter(paso); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 13px; background: var(--color-heroe); color: #fff; font-weight: 800; font-size: 14px; display: grid; place-items: center; }
 .pasos-instalar li span { color: var(--color-texto-suave); font-size: 14px; }
 body.sin-scroll { overflow: hidden; }
+
+/* ---- 0.11.0 (fase 2 · hito 2.1): sedes en tarjetas con mapa y precios ---- */
+.sedes-carrusel { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 2px 8px; margin: 0 -2px 2px; scrollbar-width: none; }
+.sedes-carrusel::-webkit-scrollbar { display: none; }
+.sede-tarjeta { flex: 0 0 112px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 4px 4px 8px; border-radius: 16px; border: 1px solid var(--color-linea); background: var(--color-tarjeta); color: var(--color-texto); text-align: left; }
+.sede-tarjeta[aria-pressed=true] { border: 2px solid var(--color-acento); padding: 3px 3px 7px; }
+.sede-mapa { position: relative; height: 56px; border-radius: 12px; background-color: var(--color-control); display: grid; place-items: center; color: var(--color-acento); overflow: hidden; }
+.sede-mapa svg { filter: drop-shadow(0 1px 1px rgba(255, 255, 255, .9)); }
+.sede-mapa.todas { color: var(--color-texto-suave); }
+.sede-nombre { font-size: 13px; font-weight: 700; line-height: 1.2; padding: 0 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; min-height: 31px; }
+.sede-cuenta { font-size: 11.5px; font-weight: 600; color: var(--color-texto-suave); padding: 0 4px; }
+.osm { display: block; text-align: right; font-size: 10px; color: var(--color-texto-suave); margin: -4px 4px 8px; }
+.inscripcion-club { margin: 0 4px 12px; font-size: 13.5px; font-weight: 600; color: var(--color-texto-suave); }
+.fila small.precios { color: var(--color-acento); font-weight: 600; white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
+.precios-editor { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.precios-tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.precios-tres label, .bono-datos label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.precios-tres small, .bono-datos small, .bValidaEn small { font-size: 12px; font-weight: 600; color: var(--color-texto-suave); }
+.precios-tres input, .bono-datos input, .precio-fila input { width: 100%; box-sizing: border-box; }
+.bono-fila { border: 1px solid var(--color-linea); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.bono-datos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 8px; align-items: end; }
+.bValidaEn { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.casilla-mini { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; min-height: 32px; }
+.precio-fila { display: flex; align-items: center; gap: 8px; }
+.precio-fila .euro { font-weight: 700; color: var(--color-texto-suave); }
+.inscripcion-editor { margin-bottom: 12px; }
