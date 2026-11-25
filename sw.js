@@ -1,6 +1,6 @@
 // Service worker mínimo: guarda la "carcasa" de la app para que abra rápido.
 // Nunca guarda respuestas del servidor (datos, sesiones).
-var CACHE = 'fitclub-v24';
+var CACHE = 'fitclub-v25';
 var CARCASA = ['./', 'index.html', 'tema.css', 'estilos.css', 'config.js', 'js/api.js', 'js/agenda.js', 'js/reservas.js', 'js/equipo.js', 'js/inicio.js', 'js/compartir.js', 'js/refrescar.js', 'iconos/qr-app.svg', 'fuentes/plus-jakarta-sans-latin-400-normal.woff2', 'fuentes/plus-jakarta-sans-latin-600-normal.woff2', 'fuentes/plus-jakarta-sans-latin-700-normal.woff2', 'fuentes/plus-jakarta-sans-latin-800-normal.woff2', 'js/app.js', 'manifest.webmanifest', 'iconos/icono-192.png', 'iconos/logo-fitclub-marino.png', 'iconos/logo-fitclub-blanco-app.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CARCASA); }).then(function () { return self.skipWaiting(); }));

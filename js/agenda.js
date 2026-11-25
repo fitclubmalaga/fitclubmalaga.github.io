@@ -675,13 +675,20 @@
       // Orden (v0.12): mantener pulsada una sede (o su asa ⠿) y arrastrar; también con las flechas. Es el orden de la Agenda.
       if (g.lugares.length > 1) nodos.push(h('p', { clase: 'subtitulo', style: 'margin:10px 4px 6px', texto: 'Mantén pulsada una sede y arrástrala para cambiar el orden en que salen en la Agenda.' }));
       if (ui.resultado) { nodos.push(aviso('ok', ui.resultado)); ui.resultado = null; }
+      if (ui.error) { nodos.push(aviso('error', ui.error)); ui.error = null; }
       var listaL = h('div', { clase: 'lista-lugares', id: 'listaLugares' });
       var zonaOrden = h('div', {});
       function guardarOrden() {
         var ids = Array.prototype.map.call(listaL.children, function (c) { return c.dataset.id; });
         zonaOrden.innerHTML = '';
         U.Api.llamar('lugares.ordenar', { ids: ids }).then(function (d) { ui.gestion = d; ui.semana = null; ui.resultado = 'Orden guardado.'; repintar(); })
-          .catch(function (e) { zonaOrden.appendChild(aviso('error', e.mensaje)); });
+          .catch(function (e) {
+            // Si no se ha guardado, la lista vuelve al orden real y el aviso sale arriba, a la vista (v0.12.2).
+            ui.error = e.codigo === 'accion_invalida'
+              ? 'No se ha guardado el orden: el servidor aún no tiene esta función. En Apps Script, crea la «Nueva versión» de la implementación (Implementar → Gestionar implementaciones → ✏️ → Nueva versión).'
+              : 'No se ha guardado el orden: ' + e.mensaje;
+            repintar(); window.scrollTo(0, 0);
+          });
       }
       function mover(tarjeta, paso) {
         var hermano = paso < 0 ? tarjeta.previousElementSibling : tarjeta.nextElementSibling;
