@@ -389,6 +389,11 @@
         h('div', { clase: 'fila' }, [h('span', { texto: 'Última vez' }), h('span', { clase: 'valor', texto: p.ultima ? diaMes(p.ultima) : '—' })])
       ]));
       if (p.estado !== 'ACTIVO') { caja.appendChild(h('p', { clase: 'subtitulo', texto: 'Esta persona está de baja del club.' })); return; }
+      var zonaCobro = h('div', {});
+      caja.appendChild(h('button', { clase: 'boton secundario', type: 'button', id: 'cobrarFicha', style: 'margin-top:12px', texto: 'Cobrar', alClick: function () {
+        hojaCobroFuera(U, { usuario_id: p.id, nombre: p.nombre, apellidos: p.apellidos }, null, function (r) { zonaCobro.innerHTML = ''; zonaCobro.appendChild(U.aviso('ok', r.mensaje)); });
+      } }));
+      caja.appendChild(zonaCobro);
       caja.appendChild(h('p', { clase: 'seccion', texto: 'Actividades' }));
       var bajas = {};
       p.bajas.forEach(function (b) { bajas[b.actividad_id] = b; });
@@ -448,7 +453,63 @@
     return [caja];
   };
 
+  /**
+   * Hito 2.3 · «Cobrar» fuera de una sesión (desde «Pendiente de cobro» o la ficha de una persona).
+   * persona = {usuario_id, nombre, apellidos, total_cent?}. vendibles = lista de inicio.datos (si no llega, se pide).
+   * Salda lo que debe (en las actividades de quien cobra) y/o vende bono, mes o trimestre. Una clave por cada apertura.
+   */
+  function hojaCobroFuera(U, persona, vendibles, alCobrar) {
+    var h = U.h, clave = nuevaClave(), metodo = 'EFECTIVO';
+    var capa = h('div', { clase: 'capa-compartir capa-cobro', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Cobrar a ' + persona.nombre });
+    var cuerpo = h('div', { clase: 'caja-compartir hoja-cobro hoja-cobro-fuera' });
+    function cerrar() { capa.remove(); document.body.classList.remove('sin-scroll'); }
+    capa.addEventListener('click', function (ev) { if (ev.target === capa) cerrar(); });
+    capa.appendChild(cuerpo);
+    document.body.appendChild(capa); document.body.classList.add('sin-scroll');
+    function montar(vend, debe) {
+      cuerpo.innerHTML = '';
+      var vender = h('select', { 'aria-label': 'Qué paga' }, [h('option', { value: '', texto: debe ? 'Solo lo que debe · ' + eurosLlano(debe) : 'Elige qué paga' })]
+        .concat(vend.map(function (v) { return h('option', { value: v.id, texto: v.nombre + (v.actividad && v.nombre.indexOf(v.actividad) < 0 ? ' (' + v.actividad + ')' : '') + ' · ' + eurosLlano(v.propuesto_cent) }); })));
+      var importe = h('input', { type: 'text', inputmode: 'decimal', id: 'importeFuera', 'aria-label': 'Importe' });
+      var campoImporte = h('label', { clase: 'campo' }, [h('span', { texto: 'Importe' }), importe]);
+      var saldar = h('input', { type: 'checkbox', id: 'saldarFuera' }); saldar.checked = true;
+      var casilla = h('label', { clase: 'casilla' }, [saldar, h('span', { texto: 'Saldar también lo que debe (' + eurosLlano(debe) + ')' })]);
+      function elegido() { return vend.filter(function (x) { return x.id === vender.value; })[0] || null; }
+      function ajustar() { var v = elegido(); campoImporte.style.display = v ? '' : 'none'; casilla.style.display = v && debe ? '' : 'none'; if (v) importe.value = eurosLlano(v.propuesto_cent).replace(' €', ''); }
+      vender.addEventListener('change', ajustar);
+      var seg = h('div', { clase: 'segmento', role: 'group', 'aria-label': 'Forma de pago' });
+      [['EFECTIVO', 'Efectivo'], ['BIZUM', 'Bizum']].forEach(function (m) {
+        var b = h('button', { type: 'button', texto: m[1], 'aria-pressed': metodo === m[0] ? 'true' : 'false' });
+        b.addEventListener('click', function () { metodo = m[0]; seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); });
+        seg.appendChild(b);
+      });
+      var error = h('div', {});
+      var bCobrar = h('button', { clase: 'boton', type: 'button', id: 'confirmarCobroFuera', texto: 'Cobrar', alClick: function () {
+        var v = elegido(), datos = { usuario_id: persona.usuario_id, clave: clave, metodo: metodo, saldar_deudas: v ? saldar.checked : true };
+        error.innerHTML = '';
+        if (!v && !debe) { error.appendChild(U.aviso('error', 'Elige qué paga.')); return; }
+        if (v) { datos.tarifa_id = v.id; if (centimos(importe.value) === null) { error.appendChild(U.aviso('error', 'Escribe un importe válido, por ejemplo 5 o 5,50.')); return; } datos.importe = importe.value; }
+        bCobrar.disabled = true; bCobrar.textContent = 'Cobrando…';
+        // Si falla, se reintenta con la MISMA clave: no cobra dos veces.
+        U.Api.llamar('cobros.cobrarFuera', datos).then(function (r) { cerrar(); if (alCobrar) alCobrar(r); })
+          .catch(function (e) { bCobrar.disabled = false; bCobrar.textContent = 'Cobrar'; error.appendChild(U.aviso('error', e.mensaje)); });
+      } });
+      cuerpo.appendChild(h('button', { clase: 'cerrar-capa', type: 'button', 'aria-label': 'Cerrar', texto: '✕', alClick: cerrar }));
+      cuerpo.appendChild(h('h2', { texto: 'Cobrar a ' + (persona.nombre + ' ' + (persona.apellidos || '')).trim() }));
+      cuerpo.appendChild(h('p', { clase: 'subtitulo', texto: debe ? 'Debe ' + eurosLlano(debe) + '.' : 'No debe nada de tus actividades.' }));
+      [h('label', { clase: 'campo' }, [h('span', { texto: 'Qué paga' }), vender]), campoImporte, casilla, seg, error, bCobrar].forEach(function (n) { cuerpo.appendChild(n); });
+      ajustar();
+    }
+    cuerpo.appendChild(h('p', { clase: 'subtitulo', texto: 'Cargando…' }));
+    if (vendibles && persona.total_cent !== undefined) montar(vendibles, persona.total_cent);
+    else U.Api.llamar('inicio.datos').then(function (d) {
+      var p = ((d.pendiente && d.pendiente.cobro && d.pendiente.cobro.personas) || []).filter(function (x) { return x.usuario_id === persona.usuario_id; })[0];
+      montar(d.vendibles_fuera || [], p ? p.total_cent : 0);
+    }).catch(function (e) { cuerpo.innerHTML = ''; cuerpo.appendChild(U.aviso('error', e.mensaje)); });
+  }
+
   window.FitclubEquipo = {
+    hojaCobroFuera: hojaCobroFuera,
     pintarLista: pintarLista,
     reiniciar: function () { estado = { modoCoach: 'mias', mias: null, lista: null, participantes: null, persona: null, resumen: null }; }
   };

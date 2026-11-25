@@ -181,6 +181,36 @@
   }
 
   // ---------- «Mi sede» del cliente (v0.12): sale la primera en su Agenda ----------
+  // Hito 2.3 · «Mis pagos» del cliente: lo que tiene en vigor, lo que debe y sus últimos 10 pagos.
+  function euros(c) { c = Math.round(Number(c) || 0); var e = Math.floor(c / 100), r = c % 100; return e + (r ? ',' + (r < 10 ? '0' : '') + r : '') + ' €'; }
+  function diaCorto(iso) { var m = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']; return Number(iso.slice(8, 10)) + ' ' + m[Number(iso.slice(5, 7)) - 1]; }
+  function seccionMisPagos() {
+    var caja = h('div', { id: 'misPagos' }, [h('p', { clase: 'seccion', texto: 'Mis pagos' })]);
+    var cuerpo = h('div', { clase: 'grupo' }, [h('div', { clase: 'fila' }, [h('span', { clase: 'subtitulo', texto: 'Cargando…' })])]);
+    caja.appendChild(cuerpo);
+    Api.llamar('perfil.misPagos').then(function (d) {
+      cuerpo.innerHTML = '';
+      var fila = function (izq, der, sub, clase) {
+        return h('div', { clase: 'fila' + (clase ? ' ' + clase : '') }, [h('span', { clase: 'que' }, [h('span', { texto: izq }), sub ? h('small', { texto: sub }) : null]), der ? h('span', { clase: 'valor', texto: der }) : null]);
+      };
+      cuerpo.appendChild(h('div', { clase: 'fila titulo-grupo' }, [h('strong', { texto: 'En vigor' })]));
+      if (!d.en_vigor.length) cuerpo.appendChild(fila('Ningún bono ni mensualidad en vigor', ''));
+      d.en_vigor.forEach(function (x) { cuerpo.appendChild(fila(x.actividad, '', x.texto)); });
+      cuerpo.appendChild(h('div', { clase: 'fila titulo-grupo' }, [h('strong', { texto: 'Pendiente de pago' })]));
+      if (!d.deudas.n) cuerpo.appendChild(fila('Nada pendiente', ''));
+      else {
+        cuerpo.appendChild(fila(d.deudas.n === 1 ? '1 sesión' : d.deudas.n + ' sesiones', d.deudas.total_cent ? euros(d.deudas.total_cent) : '',
+          d.deudas.items.map(function (i) { return diaCorto(i.fecha) + ' · ' + i.actividad; }).join(' · ') + '. Puedes abonarlo en tu próxima clase.'));
+      }
+      cuerpo.appendChild(h('div', { clase: 'fila titulo-grupo' }, [h('strong', { texto: 'Últimos pagos' })]));
+      if (!d.pagos.length) cuerpo.appendChild(fila('Aún no hay pagos', ''));
+      d.pagos.forEach(function (p) {
+        cuerpo.appendChild(fila(p.concepto, euros(p.importe_cent), diaCorto(p.fecha) + ' · ' + (p.metodo === 'BIZUM' ? 'Bizum' : 'efectivo') + (p.anulado ? ' · anulado, devuelto ' + euros(p.devuelto_cent) : ''), p.anulado ? 'anulado' : ''));
+      });
+    }).catch(function (e) { cuerpo.innerHTML = ''; cuerpo.appendChild(h('div', { clase: 'fila' }, [aviso('error', e.mensaje)])); });
+    return caja;
+  }
+
   function seccionMiSede() {
     var caja = h('div', {}, [h('p', { clase: 'seccion', texto: 'Mi sede' })]);
     var zona = h('div', {});
@@ -451,6 +481,10 @@
     if (u.estado === 'PENDIENTE') {
       // (los botones de aprobar o rechazar ya están arriba)
     } else if (u.estado === 'ACTIVO') {
+      var avisoCobro = h('div', {});
+      nodos.push(h('button', { clase: 'boton secundario', type: 'button', id: 'cobrarFicha', style: 'margin-top:12px', texto: 'Cobrar', alClick: function () {
+        window.FitclubEquipo.hojaCobroFuera(UI, { usuario_id: u.id, nombre: u.nombre, apellidos: u.apellidos }, null, function (r) { avisoCobro.innerHTML = ''; avisoCobro.appendChild(aviso('ok', r.mensaje)); });
+      } }), avisoCobro);
       nodos.push(h('p', { clase: 'seccion', texto: 'Rol' }), selectorRol);
       nodos.push(botonAccion('Guardar rol', 'secundario', function () { return Api.llamar('usuarios.cambiarRol', { id: u.id, rol: selectorRol.value }); }));
       nodos.push(botonAccion('Dar de baja del club', 'peligro', function () {
@@ -589,6 +623,7 @@
         h('div', { clase: 'fila' }, [h('span', { texto: 'Email' }), h('span', { clase: 'valor', texto: u.email })]),
         h('div', { clase: 'fila' }, [h('span', { texto: 'Rol' }), h('span', { clase: 'etiqueta', texto: NOMBRES_ROL[u.rol] || u.rol })])
       ]),
+      u.rol === 'USUARIO' ? seccionMisPagos() : null,
       u.rol === 'USUARIO' ? seccionMiSede() : null,
       h('p', { clase: 'seccion', texto: 'Apariencia' }),
       selectorTema(function () { mostrarInicio(estado.inicio); }),

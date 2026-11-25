@@ -392,3 +392,14 @@ body { overscroll-behavior-y: contain; } /* sin el «actualizar» propio del nav
 .hoja-cobro .boton { margin-top: 12px; width: 100%; }
 .casilla { display: flex; gap: 10px; align-items: center; margin: 4px 0 8px; }
 .casilla input { width: 22px; height: 22px; accent-color: var(--color-acento); }
+
+/* Hito 2.3 · avisos del cliente y «Mis pagos» */
+.hoja-avisos { text-align: left; }
+.hoja-avisos h2 { padding-right: 44px; }
+.lista-avisos { list-style: none; margin: 8px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lista-avisos li { background: var(--color-control); border-radius: 12px; padding: 12px 14px; font-size: 15px; line-height: 1.4; }
+#misPagos .titulo-grupo { background: var(--color-control); padding-top: 8px; padding-bottom: 8px; font-size: 13px; }
+#misPagos .que { display: flex; flex-direction: column; min-width: 0; }
+#misPagos .que small { color: var(--color-texto-suave); font-size: 13px; }
+#misPagos .fila.anulado .valor { text-decoration: line-through; color: var(--color-texto-suave); }
+.cobro-pendiente .que small { white-space: normal; }

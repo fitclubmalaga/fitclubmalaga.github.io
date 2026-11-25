@@ -240,7 +240,7 @@
 
     // ---------------------------------------------------------------- Boss
     function pintarBoss(d) {
-      var n = d.pendiente.altas_total + d.pendiente.listas_sin_pasar.length + d.pendiente.bajas_por_revisar;
+      var n = d.pendiente.altas_total + d.pendiente.listas_sin_pasar.length + d.pendiente.bajas_por_revisar + cobroN(d);
       var hh = d.hero;
       caja.appendChild(heroe([
         cabeceraHeroe(campana(n, function () { var el = caja.querySelector('#inicioPendiente'); if (el) el.scrollIntoView({ behavior: 'smooth' }); })),
@@ -268,11 +268,38 @@
         h('span', { clase: 'que' }, [h('strong', { texto: plural(d.pendiente.bajas_por_revisar, 'baja pedida por un coach', 'bajas pedidas por coaches') }), h('small', { texto: 'Revísalas en Usuarios' })]),
         h('button', { type: 'button', clase: 'boton-mini secundario', texto: 'Ver', alClick: function () { U.irA('usuarios'); } })]));
       if (pend.length) caja.appendChild(h('section', { id: 'inicioPendiente', clase: 'inicio-seccion', 'aria-label': 'Pendiente de ti' }, [titulo('Pendiente de ti')].concat(pend)));
+      seccionCobro(d);
     }
     function icono(nombre, color, fondo) {
       var el = h('span', { clase: 'icono-caja', 'aria-hidden': 'true', style: 'background:' + fondo + ';color:' + color });
       el.appendChild(svg(nombre, 20));
       return el;
+    }
+    // Hito 2.3 · «Pendiente de cobro»: quién debe (coach: de sus actividades; Boss: todas) y «Cobrar» sin estar en una sesión.
+    function cobroN(d) { return d.pendiente && d.pendiente.cobro ? d.pendiente.cobro.personas_n : 0; }
+    function eurosTxt(c) { c = Math.round(Number(c) || 0); var e = Math.floor(c / 100), r = c % 100; return e + (r ? ',' + (r < 10 ? '0' : '') + r : '') + ' €'; }
+    function seccionCobro(d) {
+      var pc = d.pendiente && d.pendiente.cobro;
+      if (!pc || !pc.personas_n) return;
+      var sec = h('section', { id: 'pendienteCobro', clase: 'inicio-seccion', 'aria-label': 'Pendiente de cobro' });
+      function pintarSec(pc2) {
+        sec.innerHTML = '';
+        if (!pc2.personas_n) { sec.appendChild(titulo('Pendiente de cobro')); sec.appendChild(h('p', { clase: 'subtitulo', texto: 'Nadie debe nada.' })); return; }
+        sec.appendChild(titulo('Pendiente de cobro · ' + eurosTxt(pc2.total_cent)));
+        pc2.personas.forEach(function (p) {
+          var partes = [p.total_cent ? eurosTxt(p.total_cent) : null, plural(p.n, 'sesión', 'sesiones'), 'desde el ' + diaMes(p.desde), p.actividades.join(', ')].filter(Boolean);
+          sec.appendChild(h('div', { clase: 'tarjeta pendiente cobro-pendiente' }, [U.circulo({ nombre: p.nombre, apellidos: p.apellidos }, { clase: 'mini' }),
+            h('span', { clase: 'que' }, [h('strong', { texto: (p.nombre + ' ' + p.apellidos).trim() }), h('small', { texto: partes.join(' · ') })]),
+            h('button', { type: 'button', clase: 'boton-mini', texto: 'Cobrar', 'aria-label': 'Cobrar a ' + p.nombre, alClick: function () {
+              window.FitclubEquipo.hojaCobroFuera(U, p, d.vendibles_fuera || [], function (r) {
+                pintarSec(r.pendiente); sec.insertBefore(U.aviso('ok', r.mensaje), sec.children[1] || null);
+              });
+            } })]));
+        });
+        if (pc2.personas_n > pc2.personas.length) sec.appendChild(h('p', { clase: 'subtitulo', texto: 'Y ' + (pc2.personas_n - pc2.personas.length) + ' personas más.' }));
+      }
+      pintarSec(pc);
+      caja.appendChild(sec);
     }
     function filaListaSinPasar(l, conCoach) {
       return h('div', { clase: 'tarjeta pendiente' }, [icono('lista', '#B45309', '#FEF3C7'),
@@ -321,7 +348,7 @@
     // ---------------------------------------------------------------- Coach
     function pintarCoach(d) {
       var hh = d.hero;
-      var n = d.revisar.listas_sin_pasar.length + d.revisar.faltan_seguido.length;
+      var n = d.revisar.listas_sin_pasar.length + d.revisar.faltan_seguido.length + cobroN(d);
       caja.appendChild(heroe([
         cabeceraHeroe(campana(n, function () { var el = caja.querySelector('#inicioPendiente'); if (el) el.scrollIntoView({ behavior: 'smooth' }); })),
         h('h1', { clase: 'heroe-saludo', texto: 'Hola, ' + usuario.nombre }),
@@ -346,14 +373,44 @@
             h('small', { texto: p.ultima_vez ? 'Última vez que vino: ' + diaMes(p.ultima_vez) : 'Aún no ha venido ninguna vez' })])]));
       });
       if (rev.length) caja.appendChild(h('section', { id: 'inicioPendiente', clase: 'inicio-seccion', 'aria-label': 'Para revisar' }, [titulo('Para revisar')].concat(rev)));
+      seccionCobro(d);
     }
 
     // ---------------------------------------------------------------- Cliente
+    // Hito 2.3 · campana del cliente: avisos discretos de lo suyo. El globito cuenta los que aún no ha visto
+    // (claves guardadas en este móvil); la clave cambia cuando cambia lo avisado, así que vuelve a salir.
+    function avisosVistos() { try { return JSON.parse(localStorage.getItem('fitclub_avisos_vistos') || '[]'); } catch (e) { return []; } }
+    function campanaCliente(avisos) {
+      var vistos = avisosVistos();
+      var nuevos = avisos.filter(function (a) { return vistos.indexOf(a.clave) < 0; }).length;
+      var b = campana(nuevos, function () {
+        try { localStorage.setItem('fitclub_avisos_vistos', JSON.stringify(avisos.map(function (a) { return a.clave; }))); } catch (e) { /* sin almacenamiento */ }
+        var ins = b.querySelector('.heroe-insignia'); if (ins) ins.remove();
+        b.setAttribute('aria-label', 'Avisos');
+        abrirAvisos(avisos);
+      });
+      b.id = 'campanaAvisos';
+      return b;
+    }
+    function abrirAvisos(avisos) {
+      var capa = h('div', { clase: 'capa-compartir', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Avisos' });
+      function cerrar() { capa.remove(); document.body.classList.remove('sin-scroll'); }
+      capa.addEventListener('click', function (ev) { if (ev.target === capa) cerrar(); });
+      capa.appendChild(h('div', { clase: 'caja-compartir hoja-avisos' }, [
+        h('button', { clase: 'cerrar-capa', type: 'button', 'aria-label': 'Cerrar', texto: '✕', alClick: cerrar }),
+        h('h2', { texto: 'Avisos' }),
+        avisos.length ? h('ul', { clase: 'lista-avisos' }, avisos.map(function (a) { return h('li', { clase: 'aviso-' + a.tipo.toLowerCase(), texto: a.texto }); }))
+          : h('p', { clase: 'subtitulo', texto: 'No tienes avisos.' }),
+        avisos.length ? h('p', { clase: 'subtitulo', texto: 'Tienes el detalle en Perfil → Mis pagos.' }) : null
+      ]));
+      document.body.appendChild(capa); document.body.classList.add('sin-scroll');
+    }
+
     function pintarCliente(d) {
       var hh = d.hero, p = hh.proxima;
       var reservas = hh.reservas_semana;
       caja.appendChild(heroe([
-        cabeceraHeroe(null),
+        cabeceraHeroe(campanaCliente(d.avisos || [])),
         h('h1', { clase: 'heroe-saludo', texto: 'Hola, ' + usuario.nombre }),
         cifra('Tu próxima sesión', p ? cuentaAtras(p.minutos) : null, p ? p.hora_inicio : null,
           p ? p.actividad + ' · ' + diaRelativo(p.fecha, d.hoy, p.dia) : 'Aún no tienes reservas: elige abajo una sesión.', null),
