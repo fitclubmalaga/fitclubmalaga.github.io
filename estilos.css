@@ -372,3 +372,22 @@ body { overscroll-behavior-y: contain; } /* sin el «actualizar» propio del nav
 .tarjeta.lugar.arrastrando { position: relative; z-index: 5; box-shadow: 0 12px 28px rgba(15, 30, 49, .25); transition: none; cursor: grabbing; }
 .sede-tarjeta.mia { border-color: var(--color-ok); }
 .sede-mia { align-self: flex-start; margin: -2px 4px 0; padding: 1px 8px; border-radius: 10px; background: var(--color-ok-suave); color: var(--color-ok); font-size: 11px; font-weight: 700; }
+
+/* Hito 2.2 · Cobrar en la lista */
+.cobrado-hoy { margin: 10px 0 0; font-size: 14px; font-weight: 700; }
+.fila.participante.con-cobro { flex-wrap: wrap; }
+.cobertura { display: block; color: var(--color-texto-suave); font-size: 13px; }
+.cobro-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; flex-basis: 100%; margin: -2px 0 0 50px; }
+.cobro-acciones:empty { display: none; }
+.pagar { min-height: 34px; padding: 0 10px; white-space: nowrap; border-radius: 17px; border: 1.5px solid var(--color-acento); background: transparent; color: var(--color-acento); font-size: 14px; font-weight: 700; font-family: inherit; }
+.pagar[aria-pressed=true] { background: #16A34A; border-color: #16A34A; color: #fff; }
+.mas-cobro { min-height: 34px; min-width: 34px; border-radius: 17px; border: 1px solid var(--color-linea); background: var(--color-tarjeta); color: var(--color-texto); font-size: 18px; font-weight: 700; line-height: 1; font-family: inherit; }
+.pagado { font-size: 13px; font-weight: 700; color: var(--color-ok); }
+.anular-cobro { border: 0; background: none; padding: 4px 2px; color: var(--color-error); font-size: 13px; font-weight: 600; text-decoration: underline; font-family: inherit; }
+.hoja-cobro { text-align: left; }
+.hoja-cobro h2 { padding-right: 44px; }
+.hoja-cobro .campo { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
+.hoja-cobro select, .hoja-cobro input[type=text] { min-height: 44px; border-radius: 12px; border: 0; background: var(--color-control); color: var(--color-texto); padding: 0 12px; font: inherit; }
+.hoja-cobro .boton { margin-top: 12px; width: 100%; }
+.casilla { display: flex; gap: 10px; align-items: center; margin: 4px 0 8px; }
+.casilla input { width: 22px; height: 22px; accent-color: var(--color-acento); }

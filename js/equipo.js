@@ -8,6 +8,12 @@
   function diaMes(iso) { var p = iso.split('-'); return +p[2] + ' ' + MESES[+p[1] - 1]; }
   function sumarDias(iso, n) { var p = iso.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n)).toISOString().slice(0, 10); }
   function plural(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+  // Hito 2.2 · dinero: céntimos → «5 €», «5,50 €» (con espacios duros para que no se parta la línea).
+  function euros(c) { c = Math.round(Number(c) || 0); var e = Math.floor(c / 100), r = c % 100; return e + (r ? ',' + (r < 10 ? '0' : '') + r : '') + ' €'; }
+  function eurosLlano(c) { return euros(c).replace(/ /g, ' '); }
+  function sinCorte(t) { return String(t || '').replace(/ (?=\d+(,\d+)? €)/g, ' ').replace(/ €/g, ' €'); }
+  function centimos(t) { var v = String(t || '').replace(/€/g, '').replace(/\s+/g, '').replace(',', '.'); return /^\d+(\.\d{1,2})?$/.test(v) ? Math.round(parseFloat(v) * 100) : null; }
+  function nuevaClave() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
   var estado = { modoCoach: 'mias', mias: null, lista: null, participantes: null, persona: null, resumen: null };
 
   // ------------------------------------------------------------------ lista de una sesión (Coach y Boss)
@@ -21,6 +27,7 @@
     opciones = opciones || {};
     var compacta = !!opciones.compacta;
     zonaAnadir.U = U;
+    var claveEnvio = nuevaClave(); // misma clave si hay que reintentar; nueva tras guardar bien (hito 2.2)
     caja.innerHTML = '';
     if (!compacta) caja.appendChild(h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: volver }));
     caja.appendChild(h('div', { clase: 'cargando', style: 'min-height:20vh', texto: 'Cargando la lista…' }));
@@ -30,18 +37,21 @@
     function dibujar(d, mensaje) {
       var s = d.sesion;
       var marcas = {}; // usuario_id → estado nuevo (solo lo cambiado)
+      var pagos = {}; // usuario_id → cobro preparado y aún sin guardar (hito 2.2)
+      var cobra = !!s.cobros_activos;
       caja.innerHTML = '';
       var chipAsis = h('span', { clase: 'chip ok', texto: plural(d.resumen.asistieron, 'vino', 'vinieron') });
       var chipFaltas = h('span', { clase: 'chip mal', texto: plural(d.resumen.faltaron, 'faltó', 'faltaron') });
       var chips = h('div', { clase: 'chips' }, [
         h('span', { clase: 'chip', texto: plural(d.resumen.apuntados, 'apuntado', 'apuntados') + (s.cupo !== '' ? ' de ' + s.cupo : '') }), chipAsis, chipFaltas]);
-      if (compacta) caja.appendChild(chips);
+      var chipCobrado = cobra ? h('p', { clase: 'cobrado-hoy', id: 'cobradoHoy' }) : null;
+      if (compacta) { caja.appendChild(chips); if (chipCobrado) caja.appendChild(chipCobrado); }
       else {
         caja.appendChild(h('button', { clase: 'volver', type: 'button', texto: '‹ Volver', alClick: volver }));
         caja.appendChild(h('div', { clase: 'tarjeta cabecera-lista' }, [
           h('h2', { texto: s.actividad }),
           h('p', { clase: 'subtitulo', texto: s.dia + ' ' + diaMes(s.fecha) + ' · ' + s.hora_inicio + '-' + s.hora_fin + ' · ' + s.lugar }),
-          chips
+          chips, chipCobrado
         ]));
       }
       if (mensaje) caja.appendChild(aviso('ok', mensaje));
@@ -53,7 +63,8 @@
         return;
       }
       var zona = h('div', {});
-      var bGuardar = h('button', { clase: 'boton', type: 'button', id: 'guardarLista', texto: 'Guardar lista', alClick: guardar });
+      var textoGuardar = cobra ? 'Guardar lista y cobros' : 'Guardar lista';
+      var bGuardar = h('button', { clase: 'boton', type: 'button', id: 'guardarLista', texto: textoGuardar, alClick: guardar });
       bGuardar.disabled = true;
       function actual(p) { return marcas[p.usuario_id] !== undefined ? marcas[p.usuario_id] : p.asistencia; }
       function contar() {
@@ -61,7 +72,16 @@
         d.participantes.forEach(function (p) { var a = actual(p); if (a === 'ASISTIO') v++; else if (a === 'FALTA') f++; });
         chipAsis.textContent = plural(v, 'vino', 'vinieron');
         chipFaltas.textContent = plural(f, 'faltó', 'faltaron');
-        bGuardar.disabled = !Object.keys(marcas).length;
+        bGuardar.disabled = !Object.keys(marcas).length && !Object.keys(pagos).length;
+        if (chipCobrado) {
+          var ef = d.sesion.cobrado.efectivo_cent, bz = d.sesion.cobrado.bizum_cent, sin = 0;
+          Object.keys(pagos).forEach(function (k) { if (pagos[k].metodo === 'BIZUM') bz += pagos[k].cent; else ef += pagos[k].cent; });
+          d.participantes.forEach(function (p) { if (actual(p) === 'ASISTIO' && p.cobro && p.cobro.hoy_cent > 0 && !pagos[p.usuario_id]) sin++; });
+          var partes = [];
+          if (ef && bz) partes.push(euros(ef) + ' en efectivo', euros(bz) + ' por Bizum');
+          chipCobrado.textContent = 'Cobrado: ' + euros(ef + bz) + (partes.length ? ' (' + partes.join(', ') + ')' : ef ? ' en efectivo' : bz ? ' por Bizum' : '') +
+            (sin ? ' · ' + sin + ' sin pagar' : '');
+        }
       }
       var filas = d.participantes.map(function (p) {
         var bSi = h('button', { type: 'button', clase: 'marca-lista si', 'aria-label': p.nombre + ' vino', texto: '✓ Vino' });
@@ -74,21 +94,54 @@
         function elegir(est) {
           var nuevo = actual(p) === est ? '' : est; // tocar otra vez la misma, la quita
           if (nuevo === p.asistencia) delete marcas[p.usuario_id]; else marcas[p.usuario_id] = nuevo;
+          if (nuevo !== 'ASISTIO') delete pagos[p.usuario_id]; // sin «Vino» no se cobra
           pintar(); contar();
+        }
+        function marcarVino() { if (actual(p) !== 'ASISTIO') { if (p.asistencia === 'ASISTIO') delete marcas[p.usuario_id]; else marcas[p.usuario_id] = 'ASISTIO'; } }
+        // ---- cobro (hito 2.2): «Pagó X €» con un toque; «⋯» para cambiar importe, Bizum, vender bono o mes, deudas
+        var cob = p.cobro, zonaCobro = null, bPagar = null;
+        if (cob && cobra) {
+          zonaCobro = h('div', { clase: 'cobro-acciones' });
+          var pintarCobro = function () {
+            zonaCobro.innerHTML = '';
+            cob.pagos.forEach(function (pg) {
+              zonaCobro.appendChild(h('span', { clase: 'pagado', texto: 'Pagado ' + euros(pg.importe_cent) + (pg.metodo === 'BIZUM' ? ' Bizum' : '') + ' ✓' }));
+              if (pg.puede_anular) zonaCobro.appendChild(h('button', { clase: 'anular-cobro', type: 'button', texto: 'Anular', 'aria-label': 'Anular el cobro de ' + p.nombre, alClick: function () { anularCobro(p, pg); } }));
+            });
+            if (!d.puede_pasar_lista) return;
+            var pend = pagos[p.usuario_id];
+            if (pend || cob.propuesto_cent > 0) {
+              bPagar = h('button', { clase: 'pagar', type: 'button', 'aria-pressed': pend ? 'true' : 'false', texto: 'Pagó ' + euros(pend ? pend.cent : cob.propuesto_cent) + (pend && pend.metodo === 'BIZUM' ? ' · Bizum' : ''),
+                'aria-label': p.nombre + ' pagó', alClick: function () {
+                  if (pagos[p.usuario_id]) delete pagos[p.usuario_id];
+                  else { pagos[p.usuario_id] = { cent: cob.propuesto_cent, metodo: 'EFECTIVO', saldar: true, tarifa_id: '', importe_hoy: null }; marcarVino(); }
+                  pintar(); pintarCobro(); contar();
+                } });
+              zonaCobro.appendChild(bPagar);
+            }
+            if (d.sesion.vendibles.length || cob.propuesto_cent > 0) zonaCobro.appendChild(h('button', { clase: 'mas-cobro', type: 'button', texto: '⋯', 'aria-label': 'Más opciones de cobro de ' + p.nombre,
+              alClick: function () { hojaCobro(p, function () { marcarVino(); pintar(); pintarCobro(); contar(); }); } }));
+          };
+          p._pintarCobro = pintarCobro;
+          pintarCobro();
         }
         bSi.addEventListener('click', function () { elegir('ASISTIO'); });
         bNo.addEventListener('click', function () { elegir('FALTA'); });
         bSi.disabled = bNo.disabled = !d.puede_pasar_lista;
         pintar();
-        p._pintar = pintar;
+        p._pintar = function () { pintar(); if (p._pintarCobro) p._pintarCobro(); };
         var nota = p.reserva && p.reserva !== 'CONFIRMADA' ? ' · reserva cancelada' : '';
-        return h('div', { clase: 'fila participante' }, [
+        var textoCob = cob && cobra ? sinCorte(cob.texto) + (cob.deudas_cent > 0 ? ' + debía ' + euros(cob.deudas_cent) : '') : '';
+        return h('div', { clase: 'fila participante' + (zonaCobro ? ' con-cobro' : '') }, [
           U.circulo({ nombre: p.nombre, apellidos: p.apellidos, foto: p.foto }, { clase: 'mini', ampliable: true }),
-          h('div', { clase: 'principal', style: 'flex:1;min-width:0' }, [h('span', { texto: (p.nombre + ' ' + p.apellidos).trim() }), nota ? h('small', { texto: nota.slice(3) }) : null]),
-          h('div', { clase: 'marcas' }, [bSi, bNo])
+          h('div', { clase: 'principal', style: 'flex:1;min-width:0' }, [h('span', { texto: (p.nombre + ' ' + p.apellidos).trim() }), nota ? h('small', { texto: nota.slice(3) }) : null,
+            textoCob ? h('small', { clase: 'cobertura', texto: textoCob }) : null]),
+          h('div', { clase: 'marcas' }, [bSi, bNo]),
+          zonaCobro
         ]);
       });
       caja.appendChild(h('div', { clase: 'grupo' }, filas));
+      contar();
       if (d.puede_pasar_lista) {
         caja.appendChild(h('button', { clase: 'boton enlace', type: 'button', id: 'todosVinieron', texto: 'Marcar a todos como que vinieron', alClick: function () {
           d.participantes.forEach(function (p) { if (actual(p) !== 'ASISTIO') { if (p.asistencia === 'ASISTIO') delete marcas[p.usuario_id]; else marcas[p.usuario_id] = 'ASISTIO'; } p._pintar(); });
@@ -100,9 +153,71 @@
       if (anadir) caja.appendChild(anadir);
       function guardar() {
         var lista = Object.keys(marcas).map(function (k) { return { usuario_id: k, estado: marcas[k] }; });
+        var cobros = Object.keys(pagos).map(function (k) {
+          var x = pagos[k], c = { usuario_id: k, metodo: x.metodo, saldar_deudas: x.saldar };
+          if (x.tarifa_id) c.tarifa_id = x.tarifa_id;
+          if (x.importe_hoy !== null) c.importe_hoy = x.importe_hoy;
+          return c;
+        });
         bGuardar.disabled = true; bGuardar.textContent = 'Guardando…'; zona.innerHTML = '';
-        U.Api.llamar('asistencia.guardar', { sesion_id: s.id, marcas: lista }).then(function (r) { estado.mias = null; estado.resumen = null; if (opciones.alGuardar) opciones.alGuardar(r); dibujar(r, r.mensaje); })
-          .catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = 'Guardar lista'; zona.appendChild(aviso('error', e.mensaje)); });
+        // Un solo envío con lista y cobros. Si falla (p. ej. sin cobertura), se reintenta con la MISMA clave: no cobra dos veces.
+        U.Api.llamar('lista.guardar', { sesion_id: s.id, clave: claveEnvio, marcas: lista, cobros: cobros }).then(function (r) {
+          claveEnvio = nuevaClave(); estado.mias = null; estado.resumen = null; if (opciones.alGuardar) opciones.alGuardar(r); dibujar(r, r.mensaje);
+        }).catch(function (e) { bGuardar.disabled = false; bGuardar.textContent = textoGuardar; zona.appendChild(aviso('error', e.mensaje)); });
+      }
+      function anularCobro(p, pg) {
+        var motivo = window.prompt('Se anulará el cobro de ' + p.nombre + ' y se apuntará «devuelto ' + eurosLlano(pg.importe_cent) + '». ¿Por qué?', 'Error al cobrar');
+        if (motivo === null) return;
+        zona.innerHTML = '';
+        U.Api.llamar('cobros.anular', { grupo_id: pg.grupo_id, motivo: motivo }).then(function (r) {
+          estado.mias = null; estado.resumen = null; if (opciones.alGuardar) opciones.alGuardar(r); dibujar(r, r.mensaje);
+        }).catch(function (e) { (zona.parentNode ? zona : caja).appendChild(aviso('error', e.mensaje)); });
+      }
+      /** Hoja «⋯» de una persona: importe de hoy, efectivo o Bizum, vender bono o mes, y saldar sus deudas. */
+      function hojaCobro(p, alAceptar) {
+        var cob = p.cobro, previo = pagos[p.usuario_id] || {};
+        var metodo = previo.metodo || 'EFECTIVO';
+        var capa = h('div', { clase: 'capa-compartir capa-cobro', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Cobro de ' + p.nombre });
+        var vender = h('select', { 'aria-label': 'Qué paga' }, [h('option', { value: '', texto: cob.hoy_cent > 0 ? 'La sesión de hoy · ' + eurosLlano(cob.hoy_cent) : 'Nada más (solo deudas)' })]
+          .concat(d.sesion.vendibles.filter(function (v) { return v.tipo !== 'SUELTA'; }).map(function (v) {
+            return h('option', { value: v.id, selected: v.id === previo.tarifa_id, texto: v.nombre + ' · ' + eurosLlano(v.propuesto_cent) });
+          })));
+        var importe = h('input', { type: 'text', inputmode: 'decimal', id: 'importeHoy', 'aria-label': 'Importe' });
+        var campoImporte = h('label', { clase: 'campo' }, [h('span', { texto: 'Importe' }), importe]);
+        function propuestoDe() { var v = d.sesion.vendibles.filter(function (x) { return x.id === vender.value; })[0]; return v ? v.propuesto_cent : cob.hoy_cent; }
+        function ponerImporte() { var c = propuestoDe(); importe.value = c ? eurosLlano(c).replace(' €', '') : ''; campoImporte.style.display = c ? '' : 'none'; }
+        vender.addEventListener('change', ponerImporte);
+        ponerImporte();
+        if (previo.importe_hoy) importe.value = previo.importe_hoy;
+        var seg = h('div', { clase: 'segmento', role: 'group', 'aria-label': 'Forma de pago' });
+        [['EFECTIVO', 'Efectivo'], ['BIZUM', 'Bizum']].forEach(function (m) {
+          var b = h('button', { type: 'button', texto: m[1], 'aria-pressed': metodo === m[0] ? 'true' : 'false' });
+          b.addEventListener('click', function () { metodo = m[0]; seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); });
+          seg.appendChild(b);
+        });
+        var saldar = h('input', { type: 'checkbox', id: 'saldarDeudas' }); saldar.checked = previo.saldar !== false;
+        var error = h('div', {});
+        function cerrar() { capa.remove(); document.body.classList.remove('sin-scroll'); }
+        capa.addEventListener('click', function (ev) { if (ev.target === capa) cerrar(); });
+        capa.appendChild(h('div', { clase: 'caja-compartir hoja-cobro' }, [
+          h('button', { clase: 'cerrar-capa', type: 'button', 'aria-label': 'Cerrar', texto: '✕', alClick: cerrar }),
+          h('h2', { texto: (p.nombre + ' ' + p.apellidos).trim() }),
+          h('p', { clase: 'subtitulo', texto: cob.texto + (cob.deudas_cent > 0 ? ' · debe ' + eurosLlano(cob.deudas_cent) + ' de otros días' : '') }),
+          h('label', { clase: 'campo' }, [h('span', { texto: 'Qué paga' }), vender]), campoImporte, seg,
+          cob.deudas_cent > 0 ? h('label', { clase: 'casilla' }, [saldar, h('span', { texto: 'Saldar también lo que debe (' + eurosLlano(cob.deudas_cent) + ')' })]) : null,
+          error,
+          h('button', { clase: 'boton', type: 'button', texto: 'Aceptar', alClick: function () {
+            var hoy = propuestoDe() ? centimos(importe.value) : 0;
+            if (propuestoDe() && (hoy === null || hoy < 1)) { error.innerHTML = ''; error.appendChild(aviso('error', 'Escribe un importe válido, por ejemplo 5 o 5,50.')); return; }
+            var deudas = cob.deudas_cent > 0 && saldar.checked ? cob.deudas_cent : 0;
+            if (!hoy && !deudas) { error.innerHTML = ''; error.appendChild(aviso('error', 'No hay nada que cobrar: elige qué paga.')); return; }
+            pagos[p.usuario_id] = { cent: hoy + deudas, metodo: metodo, saldar: cob.deudas_cent > 0 ? saldar.checked : true, tarifa_id: vender.value,
+              importe_hoy: propuestoDe() && hoy !== propuestoDe() || vender.value ? importe.value : null };
+            cerrar(); alAceptar();
+          } })
+        ]));
+        document.body.appendChild(capa); document.body.classList.add('sin-scroll');
+        vender.focus();
       }
     }
   }
