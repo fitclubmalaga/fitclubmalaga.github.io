@@ -326,6 +326,15 @@ button.fila-dia::after { content: '›'; color: var(--color-texto-suave); font-s
 .pasos-instalar li::before { content: counter(paso); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 13px; background: var(--color-heroe); color: #fff; font-weight: 800; font-size: 14px; display: grid; place-items: center; }
 .pasos-instalar li span { color: var(--color-texto-suave); font-size: 14px; }
 body.sin-scroll { overflow: hidden; }
+/* Deslizar hacia abajo para actualizar (js/refrescar.js) */
+body { overscroll-behavior-y: contain; } /* sin el «actualizar» propio del navegador: usamos el nuestro */
+.refrescar { position: fixed; left: 50%; top: env(safe-area-inset-top, 0px); z-index: 60; width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; background: var(--color-tarjeta); color: var(--color-texto-suave);
+  box-shadow: var(--sombra-barra); transform: translate(-50%, -50px); opacity: 0; pointer-events: none; }
+.refrescar.listo { color: var(--color-acento); }
+.refrescar.girando svg { animation: refrescar-gira .8s linear infinite; }
+@keyframes refrescar-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refrescar.girando svg { animation-duration: 2.4s; } }
 
 /* ---- 0.11.0 (fase 2 · hito 2.1): sedes en tarjetas con mapa y precios ---- */
 .sedes-carrusel { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 2px 8px; margin: 0 -2px 2px; scrollbar-width: none; }

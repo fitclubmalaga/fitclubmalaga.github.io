@@ -6,6 +6,9 @@
   var $pestanas = document.getElementById('pestanas');
   var $pestanasInt = document.getElementById('pestanasInterior');
   var estado = { inicio: null, pestana: null };
+  // Tras «deslizar para actualizar» (js/refrescar.js) se vuelve a la misma pestaña.
+  try { estado.pestana = sessionStorage.getItem('fitclub_pestana'); sessionStorage.removeItem('fitclub_pestana'); } catch (e) { /* sin almacenamiento */ }
+  window.FitclubApp = { pestana: function () { return estado.inicio ? estado.pestana : null; } };
 
   // ---------- utilidades de DOM ----------
   function h(etiqueta, atributos, hijos) {
