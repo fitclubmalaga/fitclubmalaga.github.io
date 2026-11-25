@@ -328,10 +328,11 @@ button.fila-dia::after { content: '›'; color: var(--color-texto-suave); font-s
 body.sin-scroll { overflow: hidden; }
 /* Deslizar hacia abajo para actualizar (js/refrescar.js) */
 body { overscroll-behavior-y: contain; } /* sin el «actualizar» propio del navegador: usamos el nuestro */
-.refrescar { position: fixed; left: 50%; top: env(safe-area-inset-top, 0px); z-index: 60; width: 40px; height: 40px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; background: var(--color-tarjeta); color: var(--color-texto-suave);
-  box-shadow: var(--sombra-barra); transform: translate(-50%, -50px); opacity: 0; pointer-events: none; }
-.refrescar.listo { color: var(--color-acento); }
+.refrescar { position: fixed; left: 50%; top: env(safe-area-inset-top, 0px); z-index: 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: var(--color-texto-suave); transform: translate(-50%, -64px); opacity: 0; pointer-events: none; }
+.refrescar svg { width: 26px; height: 26px; }
+.refrescar-texto { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.refrescar.listo, .refrescar.girando { color: var(--color-acento); }
 .refrescar.girando svg { animation: refrescar-gira .8s linear infinite; }
 @keyframes refrescar-gira { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .refrescar.girando svg { animation-duration: 2.4s; } }
